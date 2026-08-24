@@ -1,0 +1,9 @@
+﻿namespace TrazabilidadPedidos.Server.Services
+{
+    public interface IApplicationInfoService
+    {
+        string ApplicationName { get; }
+
+        string Version { get; }
+    }
+}
