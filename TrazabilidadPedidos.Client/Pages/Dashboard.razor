@@ -1,0 +1,381 @@
+﻿@page "/dashboard"
+@inject Microsoft.JSInterop.IJSRuntime JS
+@inject NavigationManager Navigation
+@inject OrderClientService OrderService
+@inject ReportClientService ReportService
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="dashboard-page">
+    <div class="dashboard-heading">
+        <div>
+            <h1>Panel Principal</h1>
+            <p>Vista general del sistema NovaTec.</p>
+        </div>
+        <div class="role-badge">@GetRoleDisplayName(userRole)</div>
+    </div>
+
+    @if (isLoading && (userRole == "Administrator" || userRole == "Operator"))
+    {
+        <div class="loading-panel">
+            <div class="spinner"></div>
+            <p>Cargando datos del panel...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="error-panel">
+            <span class="error-icon">!</span>
+            <p>@errorMessage</p>
+            <button class="btn-retry" @onclick="LoadDashboardData">Reintentar</button>
+        </div>
+    }
+
+    @if (userRole == "Administrator" || userRole == "Operator")
+    {
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-info">
+                    <span class="kpi-label">PEDIDOS TOTALES</span>
+                    <div class="kpi-number">@totalOrders</div>
+                </div>
+                <div class="kpi-icon">P</div>
+            </div>
+            <div class="kpi-card kpi-yellow">
+                <div class="kpi-info">
+                    <span class="kpi-label">PENDIENTES</span>
+                    <div class="kpi-number">@pendingOrders</div>
+                </div>
+                <div class="kpi-icon">!</div>
+            </div>
+            <div class="kpi-card kpi-green">
+                <div class="kpi-info">
+                    <span class="kpi-label">INGRESOS TOTALES</span>
+                    <div class="kpi-number">Bs @totalRevenue.ToString("N2")</div>
+                </div>
+                <div class="kpi-icon">B</div>
+            </div>
+            <div class="kpi-card kpi-purple">
+                <div class="kpi-info">
+                    <span class="kpi-label">ENTREGADOS</span>
+                    <div class="kpi-number">@deliveredOrders</div>
+                </div>
+                <div class="kpi-icon">E</div>
+            </div>
+        </div>
+
+        <div class="charts-row">
+            <div class="chart-card">
+                <h3>Ventas por mes</h3>
+                <div class="chart-container">
+                    <canvas id="salesByMonthChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Pedidos por estado</h3>
+                <div class="chart-container">
+                    <canvas id="ordersByStatusChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-grid">
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Pedidos recientes</h3>
+                    <button class="btn-link" @onclick='() => Navigation.NavigateTo("/pedidos")'>Ver todos</button>
+                </div>
+                @if (recentOrders.Any())
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Pedido</th>
+                                <th>Cliente</th>
+                                <th>Total</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var o in recentOrders)
+                            {
+                                <tr>
+                                    <td><span class="code-badge">@o.Code</span></td>
+                                    <td>@o.CustomerName</td>
+                                    <td>Bs @o.Total.ToString("N2")</td>
+                                    <td><span class="status-pill @GetStatusClass(o.StatusName)">@o.StatusName</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="no-data">No hay pedidos recientes.</p>
+                }
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Productos con stock bajo</h3>
+                    <button class="btn-link" @onclick='() => Navigation.NavigateTo("/inventario")'>Ver inventario</button>
+                </div>
+                @if (lowStockItems.Any())
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Stock</th>
+                                <th>Minimo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in lowStockItems)
+                            {
+                                <tr>
+                                    <td>@item.ProductName</td>
+                                    <td><span class="stock-badge @(item.CurrentStock == 0 ? "critical" : "warning")">@item.CurrentStock</span></td>
+                                    <td>@item.MinStock</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="no-data">Todos los productos tienen stock suficiente.</p>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="welcome-panel">
+            <div class="welcome-content">
+                <span class="welcome-label">BIENVENIDO</span>
+                <h2>@userName</h2>
+                <p>Sistema de gestion para clientes, inventario y despachos.</p>
+            </div>
+            <div class="welcome-decoration">TE</div>
+        </div>
+
+        <div class="module-grid">
+            @if (userRole == "Customer")
+            {
+                <div class="module-card">
+                    <div class="module-icon clients-icon">C</div>
+                    <div class="module-body">
+                        <span class="module-type">COMPRAS</span>
+                        <h3>Catalogo</h3>
+                        <p>Explora nuestros productos disponibles.</p>
+                        <button class="module-button" @onclick='() => Navigation.NavigateTo("/catalogo")'>
+                            Ver catalogo <span>&rarr;</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-icon inventory-icon">P</div>
+                    <div class="module-body">
+                        <span class="module-type">SEGUIMIENTO</span>
+                        <h3>Mis pedidos</h3>
+                        <p>Revisa el estado de tus pedidos.</p>
+                        <button class="module-button" @onclick='() => Navigation.NavigateTo("/mis-pedidos")'>
+                            Ver pedidos <span>&rarr;</span>
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (userRole == "DeliveryDriver")
+            {
+                <div class="module-card">
+                    <div class="module-icon dispatch-icon">D</div>
+                    <div class="module-body">
+                        <span class="module-type">ENTREGAS</span>
+                        <h3>Mis despachos</h3>
+                        <p>Visualiza y gestiona tus entregas asignadas.</p>
+                        <button class="module-button" @onclick='() => Navigation.NavigateTo("/mis-despachos")'>
+                            Ver despachos <span>&rarr;</span>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string userName = "Usuario";
+    private string userRole = "";
+    private int totalOrders = 0;
+    private int pendingOrders = 0;
+    private int deliveredOrders = 0;
+    private decimal totalRevenue = 0;
+    private List<OrderDto> recentOrders = new();
+    private List<LowStockItemDto> lowStockItems = new();
+    private bool isLoading = true;
+    private string errorMessage = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            userName = await JS.InvokeAsync<string>("localStorage.getItem", "userName") ?? "Usuario";
+            userRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole") ?? "";
+            StateHasChanged();
+
+            if (userRole == "Administrator" || userRole == "Operator")
+            {
+                await LoadDashboardData();
+            }
+            else
+            {
+                isLoading = false;
+            }
+        }
+    }
+
+    private async Task LoadDashboardData()
+    {
+        isLoading = true;
+        errorMessage = "";
+        StateHasChanged();
+
+        try
+        {
+            var orders = await OrderService.GetAllAsync();
+
+            totalOrders = orders.Count;
+            pendingOrders = orders.Count(o => o.StatusName == "Pendiente");
+            deliveredOrders = orders.Count(o => o.StatusName == "Entregado");
+            totalRevenue = orders
+                .Where(o => o.StatusName == "Entregado" || o.StatusName == "ListoParaEntrega" || o.StatusName == "EnCamino")
+                .Sum(o => o.Total);
+
+            recentOrders = orders
+                .OrderByDescending(o => o.OrderDate)
+                .Take(5)
+                .ToList();
+
+            var statusGroups = orders
+                .GroupBy(o => o.StatusName)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            await JS.InvokeVoidAsync("chartInterop.createBarChart",
+                "ordersByStatusChart",
+                statusGroups.Keys.ToArray(),
+                statusGroups.Values.ToArray(),
+                "Pedidos");
+
+            try
+            {
+                var dashboardReport = await ReportService.GetDashboardReportAsync();
+                if (dashboardReport?.SalesByMonth.Any() == true)
+                {
+                    var labels = dashboardReport.SalesByMonth.Select(s => s.Month).ToArray();
+                    var data = dashboardReport.SalesByMonth.Select(s => (object)s.Total).ToArray();
+
+                    await JS.InvokeVoidAsync("chartInterop.createBarChart",
+                        "salesByMonthChart",
+                        labels,
+                        data,
+                        "Ventas (Bs)");
+                }
+                else
+                {
+                    await BuildSalesChartFromOrders(orders);
+                }
+
+                if (dashboardReport?.LowStockItems.Any() == true)
+                {
+                    lowStockItems = dashboardReport.LowStockItems.Take(5).Select(l => new LowStockItemDto
+                    {
+                        ProductName = l.ProductName,
+                        ProductCode = l.ProductCode,
+                        CurrentStock = l.CurrentStock,
+                        MinStock = 5
+                    }).ToList();
+                }
+            }
+            catch
+            {
+                _ = BuildSalesChartFromOrders(orders);
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Sesion expirada. Inicie sesion nuevamente.";
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar datos del panel: {ex.Message}";
+        }
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task BuildSalesChartFromOrders(List<OrderDto> orders)
+    {
+        var nonCancelled = orders.Where(o => o.StatusName != "Cancelado").ToList();
+
+        var monthLabels = nonCancelled
+            .GroupBy(o => o.OrderDate.ToString("MMM yyyy"))
+            .OrderBy(g => g.Key)
+            .Select(g => g.Key)
+            .ToArray();
+        var monthData = nonCancelled
+            .GroupBy(o => o.OrderDate.ToString("MMM yyyy"))
+            .OrderBy(g => g.Key)
+            .Select(g => (object)g.Sum(o => o.Total))
+            .ToArray();
+
+        if (monthLabels.Any())
+        {
+            await JS.InvokeVoidAsync("chartInterop.createBarChart",
+                "salesByMonthChart",
+                monthLabels,
+                monthData,
+                "Ventas (Bs)");
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("chartInterop.createBarChart",
+                "salesByMonthChart",
+                new[] { "Sin datos" },
+                new object[] { 0 },
+                "Ventas (Bs)");
+        }
+    }
+
+    private static string GetStatusClass(string status) => status switch
+    {
+        "Pendiente" => "st-pending",
+        "Aceptado" => "st-accepted",
+        "Preparando" => "st-preparing",
+        "ListoParaEntrega" => "st-ready",
+        "EnCamino" => "st-route",
+        "Entregado" => "st-delivered",
+        "Cancelado" => "st-cancelled",
+        _ => ""
+    };
+
+    private static string GetRoleDisplayName(string role) => role switch
+    {
+        "Administrator" => "Administrador",
+        "Operator" => "Operador",
+        "Customer" => "Cliente",
+        "DeliveryDriver" => "Repartidor",
+        _ => role
+    };
+
+    private class LowStockItemDto
+    {
+        public string ProductName { get; set; } = "";
+        public string ProductCode { get; set; } = "";
+        public int CurrentStock { get; set; }
+        public int MinStock { get; set; }
+    }
+}

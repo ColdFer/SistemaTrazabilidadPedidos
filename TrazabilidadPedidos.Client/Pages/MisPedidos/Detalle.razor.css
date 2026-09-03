@@ -1,0 +1,244 @@
+.order-detail-page {
+    max-width: 950px;
+    margin: auto;
+}
+
+.btn-back {
+    background: white;
+    border: 1px solid #d9e0ea;
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #536274;
+    margin-bottom: 24px;
+}
+
+.btn-back:hover {
+    background: #f4f7fb;
+}
+
+.order-header-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border: 1px solid #e1e7ee;
+    border-radius: 14px;
+    padding: 22px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 6px 18px rgba(25, 48, 76, .05);
+}
+
+.order-info h2 {
+    margin: 0;
+    color: #17324d;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.order-info p {
+    margin: 4px 0 0;
+    color: #7b8796;
+    font-size: 13px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.status-badge.pending {
+    background: #fff3db;
+    color: #9c701a;
+}
+
+.status-badge.preparing {
+    background: #e8f2ff;
+    color: #3473bd;
+}
+
+.status-badge.in-route {
+    background: #eeeaff;
+    color: #6551b5;
+}
+
+.status-badge.delivered {
+    background: #e5f6ed;
+    color: #258158;
+}
+
+.order-grid {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 24px;
+    align-items: start;
+}
+
+.order-items-card,
+.order-timeline-card {
+    background: white;
+    border: 1px solid #e1e7ee;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 6px 18px rgba(25, 48, 76, .05);
+}
+
+.order-items-card h3,
+.order-timeline-card h3 {
+    margin: 0 0 18px;
+    color: #17324d;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.items-table th {
+    background: #f8fafc;
+    color: #718096;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    font-weight: 700;
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid #e8edf3;
+}
+
+.items-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #edf1f5;
+    color: #526174;
+    font-size: 12px;
+}
+
+.item-cell strong {
+    display: block;
+    color: #27394e;
+    font-size: 12px;
+}
+
+.item-cell span {
+    color: #98a3b0;
+    font-size: 10px;
+}
+
+.order-total {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 16px;
+    margin-top: 12px;
+    border-top: 1px solid #edf0f4;
+    font-size: 16px;
+    color: #17324d;
+    font-weight: 800;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 28px;
+}
+
+.timeline-step {
+    position: relative;
+    padding-bottom: 24px;
+    padding-left: 20px;
+}
+
+.timeline-step:last-child {
+    padding-bottom: 0;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -28px;
+    top: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    border: 3px solid white;
+    box-shadow: 0 0 0 2px #e5e7eb;
+}
+
+.timeline-step.completed .timeline-dot {
+    background: #26784c;
+    box-shadow: 0 0 0 2px #26784c;
+}
+
+.timeline-step.current .timeline-dot {
+    background: #3478d4;
+    box-shadow: 0 0 0 2px #3478d4;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 2px #3478d4; }
+    50% { box-shadow: 0 0 0 6px rgba(52, 120, 212, .2); }
+}
+
+.timeline-step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 20px;
+    width: 2px;
+    height: calc(100% - 8px);
+    background: #e5e7eb;
+}
+
+.timeline-step.completed:not(:last-child)::before {
+    background: #26784c;
+}
+
+.timeline-content strong {
+    display: block;
+    color: #40526a;
+    font-size: 13px;
+}
+
+.timeline-step.completed .timeline-content strong {
+    color: #26784c;
+}
+
+.timeline-step.current .timeline-content strong {
+    color: #3478d4;
+}
+
+.timeline-date {
+    color: #98a3b0;
+    font-size: 11px;
+}
+
+.loading-box,
+.empty-box {
+    padding: 55px 20px;
+    text-align: center;
+    color: #8591a0;
+    background: white;
+    border-radius: 14px;
+}
+
+.empty-box strong {
+    color: #536174;
+}
+
+@media (max-width: 800px) {
+    .order-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .order-header-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+}

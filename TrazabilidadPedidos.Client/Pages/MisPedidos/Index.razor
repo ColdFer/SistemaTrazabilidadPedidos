@@ -1,0 +1,123 @@
+@page "/mis-pedidos"
+@inject OrderClientService OrderService
+@inject NavigationManager Navigation
+
+<PageTitle>Mis Pedidos</PageTitle>
+
+<div class="orders-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Mis Pedidos</h1>
+            <p>Consulta tus compras y su estado actual.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando pedidos...</div>
+    }
+    else if (!orders.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-icon">📦</div>
+            <strong>No tienes pedidos aún.</strong>
+            <p>Explora nuestro catálogo y realiza tu primera compra.</p>
+            <button class="btn-primary" @onclick="IrCatalogo">Ver catálogo</button>
+        </div>
+    }
+    else
+    {
+        <div class="table-card">
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in orders)
+                    {
+                        <tr>
+                            <td><strong>@order.Code</strong></td>
+                            <td>@order.OrderDate.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td><strong>Bs @order.Total.ToString("N2")</strong></td>
+                            <td>
+                                <span class="@GetStatusClass(order.StatusName)">
+                                    @order.StatusName
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn-detail"
+                                        @onclick="() => VerDetalle(order.Id)">
+                                    Ver detalle
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+</div>
+
+@code {
+    private List<OrderDto> orders = new();
+    private bool loading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        try
+        {
+            loading = true;
+            orders = await OrderService.GetMyOrdersAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudieron cargar los pedidos.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void VerDetalle(int orderId)
+    {
+        Navigation.NavigateTo($"/mis-pedidos/{orderId}");
+    }
+
+    private void IrCatalogo()
+    {
+        Navigation.NavigateTo("/catalogo");
+    }
+
+    private static string GetStatusClass(string status) => status switch
+    {
+        "Pendiente" => "status-badge pending",
+        "Preparando" => "status-badge preparing",
+        "En camino" => "status-badge in-route",
+        "Entregado" => "status-badge delivered",
+        _ => "status-badge"
+    };
+}

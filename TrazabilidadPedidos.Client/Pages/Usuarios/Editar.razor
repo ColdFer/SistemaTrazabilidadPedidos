@@ -1,0 +1,273 @@
+﻿@page "/usuarios/editar/{Id:int}"
+
+@using TrazabilidadPedidos.Client.Services
+@using TrazabilidadPedidos.Shared.DTOs.Users
+
+@inject ManagedUserClientService UserService
+@inject NavigationManager Navigation
+
+<PageTitle>Editar usuario</PageTitle>
+
+<div class="edit-page">
+
+    <div class="page-header">
+
+        <div>
+            <h1>Editar usuario</h1>
+            <p>Modificar información y contraseña del usuario.</p>
+        </div>
+
+        <button class="btn-back"
+                @onclick="Volver">
+            ← Volver
+        </button>
+
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-box">
+            Cargando información...
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert-error">
+                @errorMessage
+            </div>
+        }
+
+        <div class="form-card">
+
+            <EditForm Model="model"
+                      OnValidSubmit="GuardarAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Nombre</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="model.FirstName" />
+
+                        <ValidationMessage For="@(() => model.FirstName)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Apellido</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="model.LastName" />
+
+                        <ValidationMessage For="@(() => model.LastName)" />
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Correo electrónico</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="model.Email" />
+
+                        <ValidationMessage For="@(() => model.Email)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Rol</label>
+
+                        <input class="form-control"
+                               value="@roleName"
+                               disabled />
+                    </div>
+
+                    @if (roleName == "DeliveryDriver")
+                    {
+                        <div class="form-group">
+                            <label>Teléfono</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="model.Phone" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Disponibilidad</label>
+
+                            <label class="checkbox-line">
+                                <InputCheckbox @bind-Value="driverAvailable" />
+                                Repartidor disponible
+                            </label>
+                        </div>
+                    }
+
+                    <div class="form-group full-width">
+                        <label>Nueva contraseña</label>
+
+                        <InputText type="password"
+                                   class="form-control"
+                                   @bind-Value="model.NewPassword" />
+
+                        <small class="help">
+                            Déjalo vacío si no deseas cambiarla.
+                        </small>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Confirmar nueva contraseña</label>
+
+                        <InputText type="password"
+                                   class="form-control"
+                                   @bind-Value="model.ConfirmNewPassword" />
+                    </div>
+
+                    <div class="form-group full-width">
+
+                        <label class="checkbox-line">
+                            <InputCheckbox @bind-Value="model.IsActive" />
+                            Usuario activo
+                        </label>
+
+                    </div>
+
+                </div>
+
+                <div class="actions">
+
+                    <button type="button"
+                            class="btn-cancel"
+                            @onclick="Volver">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn-save"
+                            disabled="@saving">
+
+                        @(saving ? "Guardando..." : "Guardar cambios")
+
+                    </button>
+
+                </div>
+
+            </EditForm>
+
+        </div>
+    }
+
+</div>
+
+@code {
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private UpdateManagedUserRequest model = new();
+
+    private bool loading = true;
+    private bool saving;
+
+    private bool driverAvailable;
+
+    private string roleName = "";
+
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarUsuario();
+    }
+
+    private async Task CargarUsuario()
+    {
+        try
+        {
+            loading = true;
+
+            var usuarios = await UserService.GetAllAsync();
+
+            var usuario = usuarios.FirstOrDefault(x => x.Id == Id);
+
+            if (usuario == null)
+            {
+                Navigation.NavigateTo("/usuarios");
+                return;
+            }
+
+            roleName = usuario.Role;
+
+            driverAvailable = usuario.IsAvailable ?? false;
+
+            model = new UpdateManagedUserRequest
+            {
+                FirstName = usuario.FirstName,
+                LastName = usuario.LastName,
+                Email = usuario.Email,
+                Phone = usuario.Phone,
+                IsActive = usuario.IsActive
+            };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+        catch
+        {
+            errorMessage = "Error al cargar el usuario.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        errorMessage = null;
+        saving = true;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(model.NewPassword))
+            {
+                if (model.NewPassword != model.ConfirmNewPassword)
+                {
+                    errorMessage = "Las contraseñas no coinciden.";
+                    return;
+                }
+            }
+
+            model.IsAvailable = driverAvailable;
+
+            var ok = await UserService.UpdateAsync(Id, model);
+
+            if (ok == null)
+            {
+                errorMessage = "No fue posible actualizar el usuario.";
+                return;
+            }
+
+            Navigation.NavigateTo("/usuarios");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al actualizar el usuario.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/usuarios");
+    }
+
+}

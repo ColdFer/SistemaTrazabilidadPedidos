@@ -1,0 +1,264 @@
+@page "/mis-despachos"
+@inject DeliveryClientService DeliveryService
+@inject OrderClientService OrderService
+@inject NavigationManager Navigation
+
+<PageTitle>Mis Despachos</PageTitle>
+
+<div class="dispatches-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Mis Despachos</h1>
+            <p>Pedidos asignados para entrega. Usa el mapa para llegar al destino.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert-success">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando despachos...</div>
+    }
+    else if (!deliveries.Any())
+    {
+        <div class="empty-state">
+            <strong>No tienes despachos asignados.</strong>
+        </div>
+    }
+    else
+    {
+        <div class="summary-grid">
+            <div class="summary-card">
+                <span>TOTAL</span>
+                <strong>@deliveries.Count</strong>
+                <small>Asignados</small>
+            </div>
+            <div class="summary-card">
+                <span>PENDIENTES</span>
+                <strong>@deliveries.Count(d => d.Status <= 3)</strong>
+                <small>Por iniciar</small>
+            </div>
+            <div class="summary-card">
+                <span>EN CAMINO</span>
+                <strong>@deliveries.Count(d => d.Status == 4)</strong>
+                <small>En ruta</small>
+            </div>
+            <div class="summary-card">
+                <span>ENTREGADOS</span>
+                <strong>@deliveries.Count(d => d.Status == 5)</strong>
+                <small>Completados</small>
+            </div>
+        </div>
+
+        <div class="dispatch-cards">
+            @foreach (var delivery in deliveries)
+            {
+                var orderCoords = orderCoordinates.GetValueOrDefault(delivery.OrderId);
+                <div class="dispatch-card">
+                    <div class="dispatch-header">
+                        <div>
+                            <strong>@delivery.OrderCode</strong>
+                            <span class="@GetStatusClass(delivery.Status)">@delivery.StatusName</span>
+                        </div>
+                        <span class="dispatch-date">@delivery.ScheduledDate.ToString("dd/MM/yyyy")</span>
+                    </div>
+                    <div class="dispatch-body">
+                        <div class="dispatch-info">
+                            <div>
+                                <span class="info-label">Cliente:</span>
+                                <span class="info-value">@delivery.CustomerName</span>
+                            </div>
+                            <div>
+                                <span class="info-label">Direccion:</span>
+                                <span class="info-value">@delivery.Address</span>
+                            </div>
+                            <div>
+                                <span class="info-label">Telefono:</span>
+                                <span class="info-value">@delivery.ContactPhone</span>
+                            </div>
+                            <div>
+                                <span class="info-label">Receptor:</span>
+                                <span class="info-value">@delivery.RecipientName</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(delivery.Observation))
+                            {
+                                <div>
+                                    <span class="info-label">Nota:</span>
+                                    <span class="info-value">@delivery.Observation</span>
+                                </div>
+                            }
+                        </div>
+
+                    @{
+                        bool hasCoords = orderCoordinates.TryGetValue(delivery.OrderId, out var orderCoordsVal);
+                    }
+                        @if (hasCoords)
+                        {
+                            <div class="dispatch-map">
+                                <OrderMap Latitude="@orderCoordsVal.Lat"
+                                          Longitude="@orderCoordsVal.Lng"
+                                          Zoom="15" />
+                            </div>
+                        }
+                    </div>
+                    <div class="dispatch-actions">
+                        @if (delivery.Status <= 3)
+                        {
+                            <button class="btn-start"
+                                    @onclick="() => IniciarEntrega(delivery.Id)"
+                                    disabled="@(processing)">
+                                Iniciar entrega
+                            </button>
+                        }
+                        @if (delivery.Status == 4)
+                        {
+                            <button class="btn-deliver"
+                                    @onclick="() => ConfirmarEntrega(delivery.Id)"
+                                    disabled="@(processing)">
+                                Confirmar entrega
+                            </button>
+                            <button class="btn-cancel-dispatch"
+                                    @onclick="() => CancelarEntrega(delivery.Id)"
+                                    disabled="@(processing)">
+                                Cancelar
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+    private List<DeliveryDto> deliveries = new();
+    private Dictionary<int, (double Lat, double Lng)> orderCoordinates = new();
+    private bool loading = true;
+    private bool processing;
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDeliveries();
+    }
+
+    private async Task LoadDeliveries()
+    {
+        try
+        {
+            loading = true;
+            deliveries = await DeliveryService.GetMyDeliveriesAsync();
+            await LoadCoordinates();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudieron cargar los despachos.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task LoadCoordinates()
+    {
+        orderCoordinates = new();
+        foreach (var delivery in deliveries.DistinctBy(d => d.OrderId))
+        {
+            try
+            {
+                var order = await OrderService.GetByIdAsync(delivery.OrderId);
+                if (order?.DeliveryLatitude.HasValue == true && order.DeliveryLongitude.HasValue)
+                {
+                    orderCoordinates[delivery.OrderId] = (order.DeliveryLatitude.Value, order.DeliveryLongitude.Value);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading coordinates: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task IniciarEntrega(int deliveryId)
+    {
+        await ChangeStatus(deliveryId, 4, "En ruta de entrega");
+    }
+
+    private async Task ConfirmarEntrega(int deliveryId)
+    {
+        await ChangeStatus(deliveryId, 5, "Entrega confirmada");
+    }
+
+    private async Task CancelarEntrega(int deliveryId)
+    {
+        await ChangeStatus(deliveryId, 7, "Cancelado por el repartidor");
+    }
+
+    private async Task ChangeStatus(int deliveryId, int status, string observation)
+    {
+        processing = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await DeliveryService.ChangeStatusAsync(
+                deliveryId,
+                new ChangeDeliveryStatusRequest
+                {
+                    Status = status,
+                    Observation = observation
+                });
+
+            if (result != null)
+            {
+                successMessage = status == 5
+                    ? "Entrega confirmada. Factura generada automaticamente."
+                    : "Estado actualizado correctamente.";
+                await LoadDeliveries();
+            }
+            else
+            {
+                errorMessage = "No se pudo actualizar el estado.";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private static string GetStatusClass(int status) => status switch
+    {
+        1 => "status-badge pending",
+        2 => "status-badge pending",
+        3 => "status-badge assigned",
+        4 => "status-badge in-route",
+        5 => "status-badge delivered",
+        _ => "status-badge"
+    };
+}

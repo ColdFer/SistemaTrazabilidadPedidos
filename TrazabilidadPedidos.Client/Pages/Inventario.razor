@@ -1,0 +1,1199 @@
+﻿@page "/inventario"
+
+@using TrazabilidadPedidos.Client.Services
+@using TrazabilidadPedidos.Shared.DTOs.Inventory
+@using TrazabilidadPedidos.Shared.Enums
+
+@inject InventoryClientService InventoryService
+@inject NavigationManager Navigation
+
+<PageTitle>Inventario</PageTitle>
+
+<div class="inventory-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Inventario</h1>
+            <p>Administra productos, categorías y movimientos de mercancía.</p>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn-secondary-custom"
+                    @onclick="OpenCategoryForm">
+                + Categoría
+            </button>
+
+            <button class="btn-primary-custom"
+                    @onclick="OpenProductForm">
+                + Nuevo producto
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert-success-custom">
+            @successMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error-custom">
+            @errorMessage
+        </div>
+    }
+
+
+    <div class="summary-grid">
+
+        <div class="summary-card">
+            <span class="summary-label">PRODUCTOS</span>
+            <strong>@products.Count</strong>
+            <small>Registrados</small>
+        </div>
+
+        <div class="summary-card">
+            <span class="summary-label">ACTIVOS</span>
+            <strong>@products.Count(p => p.IsActive)</strong>
+            <small>Productos disponibles</small>
+        </div>
+
+        <div class="summary-card">
+            <span class="summary-label">UNIDADES</span>
+            <strong>@products.Sum(p => p.CurrentStock)</strong>
+            <small>Stock total</small>
+        </div>
+
+        <div class="summary-card">
+            <span class="summary-label">MOVIMIENTOS</span>
+            <strong>@movements.Count</strong>
+            <small>Registros de inventario</small>
+        </div>
+
+    </div>
+
+
+    <div class="tabs">
+        <button class="tab-button @(activeTab == "products" ? "active" : "")"
+                @onclick='() => activeTab = "products"'>
+            Productos
+        </button>
+
+        <button class="tab-button @(activeTab == "movements" ? "active" : "")"
+                @onclick='() => activeTab = "movements"'>
+            Movimientos
+        </button>
+
+        <button class="tab-button @(activeTab == "categories" ? "active" : "")"
+                @onclick='() => activeTab = "categories"'>
+            Categorías
+        </button>
+    </div>
+
+
+    @if (showCategoryForm)
+    {
+        <div class="form-card">
+
+            <div class="form-header">
+                <div>
+                    <h3>Nueva categoría</h3>
+                    <p>Registra una categoría para organizar los productos.</p>
+                </div>
+
+                <button class="close-button"
+                        @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            <EditForm Model="categoryModel"
+                      OnValidSubmit="CreateCategoryAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Nombre</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="categoryModel.Name" />
+
+                        <ValidationMessage For="@(() => categoryModel.Name)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Descripción</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="categoryModel.Description" />
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+                    <button type="button"
+                            class="btn-cancel"
+                            @onclick="CloseForms">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn-save"
+                            disabled="@saving">
+                        @(saving ? "Guardando..." : "Registrar categoría")
+                    </button>
+                </div>
+
+            </EditForm>
+
+        </div>
+    }
+
+
+    @if (showProductForm)
+    {
+        <div class="form-card">
+
+            <div class="form-header">
+                <div>
+                    <h3>@(editingProductId == 0 ? "Nuevo producto" : "Editar producto")</h3>
+
+                    <p>
+                        @(editingProductId == 0
+                            ? "Completa la información del nuevo producto."
+                            : "Modifica la información del producto.")
+                    </p>
+                </div>
+
+                <button class="close-button"
+                        @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            @if (editingProductId == 0)
+            {
+                <EditForm Model="productModel"
+                          OnValidSubmit="CreateProductAsync">
+
+                    <DataAnnotationsValidator />
+
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label>Categoría</label>
+
+                            <InputSelect class="form-control"
+                                         @bind-Value="productModel.CategoryId">
+
+                                <option value="0">Seleccione una categoría</option>
+
+                                @foreach (var category in categories.Where(c => c.IsActive))
+                                {
+                                    <option value="@category.Id">
+                                        @category.Name
+                                    </option>
+                                }
+
+                            </InputSelect>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Código</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="productModel.Code" />
+
+                            <ValidationMessage For="@(() => productModel.Code)" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Nombre</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="productModel.Name" />
+
+                            <ValidationMessage For="@(() => productModel.Name)" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Precio (Bs)</label>
+
+                            <InputNumber class="form-control"
+                                         @bind-Value="productModel.Price" />
+
+                            <ValidationMessage For="@(() => productModel.Price)" />
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>Descripción</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="productModel.Description" />
+                        </div>
+
+                    </div>
+
+                    <div class="stock-information">
+                        El producto será registrado con stock inicial 0.
+                        El stock se administra mediante movimientos.
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button"
+                                class="btn-cancel"
+                                @onclick="CloseForms">
+                            Cancelar
+                        </button>
+
+                        <button type="submit"
+                                class="btn-save"
+                                disabled="@saving">
+                            @(saving ? "Guardando..." : "Registrar producto")
+                        </button>
+                    </div>
+
+                </EditForm>
+            }
+            else
+            {
+                <EditForm Model="updateProductModel"
+                          OnValidSubmit="UpdateProductAsync">
+
+                    <DataAnnotationsValidator />
+
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label>Categoría</label>
+
+                            <InputSelect class="form-control"
+                                         @bind-Value="updateProductModel.CategoryId">
+
+                                <option value="0">Seleccione una categoría</option>
+
+                                @foreach (var category in categories.Where(c => c.IsActive))
+                                {
+                                    <option value="@category.Id">
+                                        @category.Name
+                                    </option>
+                                }
+
+                            </InputSelect>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Código</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="updateProductModel.Code" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Nombre</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="updateProductModel.Name" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Precio (Bs)</label>
+
+                            <InputNumber class="form-control"
+                                         @bind-Value="updateProductModel.Price" />
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>Descripción</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="updateProductModel.Description" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Estado</label>
+
+                            <label class="checkbox-line">
+                                <InputCheckbox @bind-Value="updateProductModel.IsActive" />
+                                Producto activo
+                            </label>
+                        </div>
+
+                    </div>
+
+                    <div class="stock-information">
+                        El stock no se modifica desde este formulario.
+                        Utiliza un movimiento de inventario.
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button"
+                                class="btn-cancel"
+                                @onclick="CloseForms">
+                            Cancelar
+                        </button>
+
+                        <button type="submit"
+                                class="btn-save"
+                                disabled="@saving">
+                            @(saving ? "Guardando..." : "Guardar cambios")
+                        </button>
+                    </div>
+
+                </EditForm>
+            }
+
+        </div>
+    }
+
+
+    @if (showMovementForm)
+    {
+        <div class="form-card">
+
+            <div class="form-header">
+                <div>
+                    <h3>Registrar movimiento</h3>
+                    <p>Actualiza el stock mediante una operación controlada.</p>
+                </div>
+
+                <button class="close-button"
+                        @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            <EditForm Model="movementModel"
+                      OnValidSubmit="CreateMovementAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Producto</label>
+
+                        <InputSelect class="form-control"
+                                     @bind-Value="movementModel.ProductId">
+
+                            <option value="0">Seleccione un producto</option>
+
+                            @foreach (var product in products.Where(p => p.IsActive))
+                            {
+                                <option value="@product.Id">
+                                    @product.Code - @product.Name (Stock: @product.CurrentStock)
+                                </option>
+                            }
+
+                        </InputSelect>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tipo de movimiento</label>
+
+                        <InputSelect class="form-control"
+                                     @bind-Value="movementModel.Type">
+
+                            <option value="@MovementType.Entry">
+                                Entrada
+                            </option>
+
+                            <option value="@MovementType.Exit">
+                                Salida
+                            </option>
+
+                            <option value="@MovementType.Adjustment">
+                                Ajuste
+                            </option>
+
+                        </InputSelect>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            @(movementModel.Type == MovementType.Adjustment
+                                ? "Stock físico real"
+                                : "Cantidad")
+                        </label>
+
+                        <InputNumber class="form-control"
+                                     @bind-Value="movementModel.Quantity" />
+
+                        <ValidationMessage For="@(() => movementModel.Quantity)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Motivo</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="movementModel.Reason" />
+
+                        <ValidationMessage For="@(() => movementModel.Reason)" />
+                    </div>
+
+                </div>
+
+                <div class="movement-help">
+
+                    @if (movementModel.Type == MovementType.Entry)
+                    {
+                        <span>
+                            Entrada: la cantidad será sumada al stock actual.
+                        </span>
+                    }
+                    else if (movementModel.Type == MovementType.Exit)
+                    {
+                        <span>
+                            Salida: la cantidad será descontada. No se permite stock negativo.
+                        </span>
+                    }
+                    else
+                    {
+                        <span>
+                            Ajuste: la cantidad indicada reemplazará el stock actual.
+                        </span>
+                    }
+
+                </div>
+
+                <div class="form-actions">
+                    <button type="button"
+                            class="btn-cancel"
+                            @onclick="CloseForms">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn-save"
+                            disabled="@saving">
+                        @(saving ? "Procesando..." : "Registrar movimiento")
+                    </button>
+                </div>
+
+            </EditForm>
+
+        </div>
+    }
+
+
+    @if (activeTab == "products")
+    {
+        <div class="content-card">
+
+            <div class="toolbar">
+
+                <div class="search-box">
+                    <span>⌕</span>
+
+                    <input placeholder="Buscar producto por código o nombre..."
+                           @bind="searchTerm"
+                           @bind:event="oninput" />
+                </div>
+
+                <button class="btn-movement"
+                        @onclick="OpenMovementForm">
+                    Registrar movimiento
+                </button>
+
+            </div>
+
+            @if (loading)
+            {
+                <div class="empty-state">
+                    Cargando inventario...
+                </div>
+            }
+            else if (!FilteredProducts.Any())
+            {
+                <div class="empty-state">
+                    No se encontraron productos.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+
+                    <table class="inventory-table">
+
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Categoría</th>
+                                <th>Precio</th>
+                                <th>Stock</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var product in FilteredProducts)
+                            {
+                                <tr>
+
+                                    <td>
+                                        <div class="product-cell">
+                                            <div class="product-code">
+                                                @product.Code
+                                            </div>
+
+                                            <div>
+                                                <strong>@product.Name</strong>
+                                                <span>@product.Description</span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td>@product.CategoryName</td>
+
+                                    <td>Bs @product.Price.ToString("N2")</td>
+
+                                    <td>
+                                        <span class="@GetStockClass(product.CurrentStock)">
+                                            @product.CurrentStock
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        @if (product.IsActive)
+                                        {
+                                            <span class="status-badge active">
+                                                Activo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="status-badge inactive">
+                                                Inactivo
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td>
+                                        <div class="action-buttons">
+
+                                            <button class="btn-edit"
+                                                    @onclick="() => OpenEditProduct(product)">
+                                                Editar
+                                            </button>
+
+                                            @if (product.IsActive)
+                                            {
+                                                <button class="btn-deactivate"
+                                                        @onclick="() => DeactivateProductAsync(product)">
+                                                    Desactivar
+                                                </button>
+                                            }
+
+                                        </div>
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+            }
+
+        </div>
+    }
+
+
+    @if (activeTab == "movements")
+    {
+        <div class="content-card">
+
+            <div class="toolbar">
+
+                <div>
+                    <strong class="content-title">
+                        Historial de movimientos
+                    </strong>
+                </div>
+
+                <button class="btn-movement"
+                        @onclick="OpenMovementForm">
+                    + Nuevo movimiento
+                </button>
+
+            </div>
+
+            @if (!movements.Any())
+            {
+                <div class="empty-state">
+                    No existen movimientos registrados.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+
+                    <table class="inventory-table">
+
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Producto</th>
+                                <th>Tipo</th>
+                                <th>Cantidad</th>
+                                <th>Usuario</th>
+                                <th>Motivo</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var movement in movements)
+                            {
+                                <tr>
+                                    <td>
+                                        @movement.MovementDate.ToString("dd/MM/yyyy HH:mm")
+                                    </td>
+
+                                    <td>
+                                        <strong>@movement.ProductName</strong>
+                                        <div class="secondary-text">
+                                            @movement.ProductCode
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <span class="@GetMovementClass(movement.Type)">
+                                            @GetMovementName(movement.Type)
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        @movement.Quantity
+                                    </td>
+
+                                    <td>
+                                        @(string.IsNullOrWhiteSpace(movement.UserName)
+                                            ? $"Usuario #{movement.UserId}"
+                                            : movement.UserName)
+                                    </td>
+
+                                    <td>@movement.Reason</td>
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+            }
+
+        </div>
+    }
+
+
+    @if (activeTab == "categories")
+    {
+        <div class="content-card">
+
+            <div class="toolbar">
+
+                <div>
+                    <strong class="content-title">
+                        Categorías de productos
+                    </strong>
+                </div>
+
+                <button class="btn-primary-custom"
+                        @onclick="OpenCategoryForm">
+                    + Nueva categoría
+                </button>
+
+            </div>
+
+            @if (!categories.Any())
+            {
+                <div class="empty-state">
+                    No existen categorías registradas.
+                </div>
+            }
+            else
+            {
+                <div class="categories-grid">
+
+                    @foreach (var category in categories)
+                    {
+                        <div class="category-card">
+
+                            <div class="category-icon">
+                                @GetCategoryInitial(category)
+                            </div>
+
+                            <div>
+                                <strong>@category.Name</strong>
+                                <p>@category.Description</p>
+
+                                <span class="status-badge @(category.IsActive ? "active" : "inactive")">
+                                    @(category.IsActive ? "Activa" : "Inactiva")
+                                </span>
+                            </div>
+
+                        </div>
+                    }
+
+                </div>
+            }
+
+        </div>
+    }
+
+</div>
+
+
+@code {
+
+    private List<ProductDto> products = new();
+    private List<CategoryDto> categories = new();
+    private List<InventoryMovementDto> movements = new();
+
+    private CreateCategoryRequest categoryModel = new();
+    private CreateProductRequest productModel = new();
+
+    private UpdateProductRequest updateProductModel =
+        new();
+
+    private CreateInventoryMovementRequest movementModel =
+        new()
+        {
+            Type = MovementType.Entry
+        };
+
+    private int editingProductId;
+
+    private string activeTab = "products";
+    private string searchTerm = string.Empty;
+
+    private bool loading = true;
+    private bool saving;
+
+    private bool showCategoryForm;
+    private bool showProductForm;
+    private bool showMovementForm;
+
+    private string? successMessage;
+    private string? errorMessage;
+
+
+    private IEnumerable<ProductDto> FilteredProducts =>
+        string.IsNullOrWhiteSpace(searchTerm)
+            ? products
+            : products.Where(p =>
+                p.Name.Contains(
+                    searchTerm,
+                    StringComparison.OrdinalIgnoreCase)
+                ||
+                p.Code.Contains(
+                    searchTerm,
+                    StringComparison.OrdinalIgnoreCase));
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            loading = true;
+
+            categories =
+                await InventoryService.GetCategoriesAsync();
+
+            products =
+                await InventoryService.GetProductsAsync();
+
+            movements =
+                await InventoryService.GetMovementsAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "No se pudo cargar la información del inventario.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+
+    private void OpenCategoryForm()
+    {
+        ClearMessages();
+        CloseForms();
+
+        categoryModel = new();
+
+        showCategoryForm = true;
+    }
+
+
+    private void OpenProductForm()
+    {
+        ClearMessages();
+        CloseForms();
+
+        editingProductId = 0;
+
+        productModel =
+            new CreateProductRequest();
+
+        showProductForm = true;
+    }
+
+
+    private void OpenEditProduct(ProductDto product)
+    {
+        ClearMessages();
+        CloseForms();
+
+        editingProductId = product.Id;
+
+        updateProductModel =
+            new UpdateProductRequest
+            {
+                CategoryId = product.CategoryId,
+                Code = product.Code,
+                Name = product.Name,
+                Description = product.Description,
+                Price = product.Price,
+                Image = product.Image,
+                IsActive = product.IsActive
+            };
+
+        showProductForm = true;
+    }
+
+
+    private void OpenMovementForm()
+    {
+        ClearMessages();
+        CloseForms();
+
+        movementModel =
+            new CreateInventoryMovementRequest
+            {
+                Type = MovementType.Entry,
+                Quantity = 1
+            };
+
+        showMovementForm = true;
+    }
+
+
+    private void CloseForms()
+    {
+        showCategoryForm = false;
+        showProductForm = false;
+        showMovementForm = false;
+    }
+
+
+    private async Task CreateCategoryAsync()
+    {
+        ClearMessages();
+
+        try
+        {
+            saving = true;
+
+            var result =
+                await InventoryService
+                    .CreateCategoryAsync(categoryModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo registrar la categoría. Verifica que el nombre no esté repetido.";
+
+                return;
+            }
+
+            successMessage =
+                "Categoría registrada correctamente.";
+
+            CloseForms();
+
+            await LoadDataAsync();
+
+            activeTab = "categories";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al registrar la categoría.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+    private async Task CreateProductAsync()
+    {
+        ClearMessages();
+
+        if (productModel.CategoryId <= 0)
+        {
+            errorMessage =
+                "Debe seleccionar una categoría.";
+
+            return;
+        }
+
+        try
+        {
+            saving = true;
+
+            var result =
+                await InventoryService
+                    .CreateProductAsync(productModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo registrar el producto. Verifica la categoría y que el código no esté repetido.";
+
+                return;
+            }
+
+            successMessage =
+                "Producto registrado correctamente.";
+
+            CloseForms();
+
+            await LoadDataAsync();
+
+            activeTab = "products";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al registrar el producto.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+    private async Task UpdateProductAsync()
+    {
+        ClearMessages();
+
+        if (updateProductModel.CategoryId <= 0)
+        {
+            errorMessage =
+                "Debe seleccionar una categoría.";
+
+            return;
+        }
+
+        try
+        {
+            saving = true;
+
+            var result =
+                await InventoryService.UpdateProductAsync(
+                    editingProductId,
+                    updateProductModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo actualizar el producto.";
+
+                return;
+            }
+
+            successMessage =
+                "Producto actualizado correctamente.";
+
+            CloseForms();
+
+            await LoadDataAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al actualizar el producto.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+    private async Task DeactivateProductAsync(
+        ProductDto product)
+    {
+        ClearMessages();
+
+        try
+        {
+            var result =
+                await InventoryService
+                    .DeactivateProductAsync(product.Id);
+
+            if (!result)
+            {
+                errorMessage =
+                    "No se pudo desactivar el producto.";
+
+                return;
+            }
+
+            successMessage =
+                $"Producto {product.Name} desactivado correctamente.";
+
+            await LoadDataAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al desactivar el producto.";
+        }
+    }
+
+
+    private async Task CreateMovementAsync()
+    {
+        ClearMessages();
+
+        if (movementModel.ProductId <= 0)
+        {
+            errorMessage =
+                "Debe seleccionar un producto.";
+
+            return;
+        }
+
+        try
+        {
+            saving = true;
+
+            var result =
+                await InventoryService
+                    .CreateMovementAsync(movementModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo realizar el movimiento. Verifica la cantidad y el stock disponible.";
+
+                return;
+            }
+
+            successMessage =
+                "Movimiento de inventario registrado correctamente.";
+
+            CloseForms();
+
+            await LoadDataAsync();
+
+            activeTab = "movements";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al procesar el movimiento.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+    private static string GetMovementName(MovementType type)
+    {
+        return type switch
+        {
+            MovementType.Entry => "Entrada",
+            MovementType.Exit => "Salida",
+            MovementType.Adjustment => "Ajuste",
+            _ => "Movimiento"
+        };
+    }
+
+    private static string GetMovementClass(MovementType type)
+    {
+        return type switch
+        {
+            MovementType.Entry => "movement-badge entry",
+            MovementType.Exit => "movement-badge exit",
+            MovementType.Adjustment => "movement-badge adjustment",
+            _ => "movement-badge"
+        };
+    }
+
+
+    private static string GetStockClass(int stock)
+    {
+        return stock switch
+        {
+            <= 0 => "stock-badge danger",
+            <= 5 => "stock-badge warning",
+            _ => "stock-badge normal"
+        };
+    }
+
+
+    private static string GetCategoryInitial(
+        CategoryDto category)
+    {
+        return string.IsNullOrWhiteSpace(category.Name)
+            ? "C"
+            : category.Name[..1].ToUpper();
+    }
+
+
+    private void ClearMessages()
+    {
+        successMessage = null;
+        errorMessage = null;
+    }
+}

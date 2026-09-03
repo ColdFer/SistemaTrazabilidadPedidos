@@ -1,0 +1,662 @@
+﻿@page "/clientes"
+
+@using TrazabilidadPedidos.Client.Services
+@using TrazabilidadPedidos.Shared.DTOs.Customers
+
+@inject CustomerClientService CustomerService
+@inject NavigationManager Navigation
+
+<PageTitle>Clientes</PageTitle>
+
+<div class="customers-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Clientes</h1>
+            <p>Administra los clientes registrados en el sistema.</p>
+        </div>
+
+        <button class="btn-new" @onclick="OpenCreateForm">
+            <span>+</span>
+            Nuevo cliente
+        </button>
+    </div>
+
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert-success-custom">
+            @successMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error-custom">
+            @errorMessage
+        </div>
+    }
+
+
+    @if (showCreateForm)
+    {
+        <div class="form-card">
+
+            <div class="form-card-header">
+                <div>
+                    <h3>Registrar cliente</h3>
+                    <p>Completa los datos del nuevo cliente.</p>
+                </div>
+
+                <button class="close-button" @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            <EditForm Model="createModel"
+                      OnValidSubmit="CreateCustomerAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Nombre</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="createModel.FirstName" />
+
+                        <ValidationMessage For="@(() => createModel.FirstName)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Apellido</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="createModel.LastName" />
+
+                        <ValidationMessage For="@(() => createModel.LastName)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Correo electrónico</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="createModel.Email" />
+
+                        <ValidationMessage For="@(() => createModel.Email)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>CI</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="createModel.Ci" />
+
+                        <ValidationMessage For="@(() => createModel.Ci)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Teléfono</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="createModel.Phone" />
+
+                        <ValidationMessage For="@(() => createModel.Phone)" />
+                    </div>
+
+                    <div></div>
+
+                    <div class="form-group">
+                        <label>Contraseña</label>
+
+                        <InputText type="password"
+                                   class="form-control"
+                                   @bind-Value="createModel.Password" />
+
+                        <ValidationMessage For="@(() => createModel.Password)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Confirmar contraseña</label>
+
+                        <InputText type="password"
+                                   class="form-control"
+                                   @bind-Value="createModel.ConfirmPassword" />
+
+                        <ValidationMessage For="@(() => createModel.ConfirmPassword)" />
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+                    <button type="button"
+                            class="btn-cancel"
+                            @onclick="CloseForms">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn-save"
+                            disabled="@saving">
+                        @(saving ? "Guardando..." : "Registrar cliente")
+                    </button>
+                </div>
+
+            </EditForm>
+
+        </div>
+    }
+
+
+    @if (showEditForm)
+    {
+        <div class="form-card">
+
+            <div class="form-card-header">
+                <div>
+                    <h3>Editar cliente</h3>
+                    <p>Modifica la información del cliente seleccionado.</p>
+                </div>
+
+                <button class="close-button" @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            <EditForm Model="updateModel"
+                      OnValidSubmit="UpdateCustomerAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Nombre</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.FirstName" />
+
+                        <ValidationMessage For="@(() => updateModel.FirstName)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Apellido</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.LastName" />
+
+                        <ValidationMessage For="@(() => updateModel.LastName)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Correo electrónico</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.Email" />
+
+                        <ValidationMessage For="@(() => updateModel.Email)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>CI</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.Ci" />
+
+                        <ValidationMessage For="@(() => updateModel.Ci)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Teléfono</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.Phone" />
+
+                        <ValidationMessage For="@(() => updateModel.Phone)" />
+                    </div>
+
+                    <div class="form-group status-control">
+                        <label>Estado</label>
+
+                        <label class="checkbox-line">
+                            <InputCheckbox @bind-Value="updateModel.IsActive" />
+                            Cliente activo
+                        </label>
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+
+                    <button type="button"
+                            class="btn-cancel"
+                            @onclick="CloseForms">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn-save"
+                            disabled="@saving">
+                        @(saving ? "Guardando..." : "Guardar cambios")
+                    </button>
+
+                </div>
+
+            </EditForm>
+
+        </div>
+    }
+
+
+    <div class="table-card">
+
+        <div class="table-toolbar">
+
+            <div class="search-box">
+                <span>⌕</span>
+
+                <input type="text"
+                       placeholder="Buscar por nombre, correo o CI..."
+                       @bind="searchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <select class="status-filter"
+                    @bind="statusFilter">
+
+                <option value="all">Todos</option>
+                <option value="active">Activos</option>
+                <option value="inactive">Inactivos</option>
+
+            </select>
+
+        </div>
+
+
+        @if (loading)
+        {
+            <div class="loading-box">
+                Cargando clientes...
+            </div>
+        }
+        else if (!FilteredCustomers.Any())
+        {
+            <div class="empty-box">
+                <strong>No se encontraron clientes.</strong>
+                <span>Registra un nuevo cliente para comenzar.</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+
+                <table class="customers-table">
+
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Correo</th>
+                            <th>CI</th>
+                            <th>Teléfono</th>
+                            <th>Estado</th>
+                            <th class="actions-column">Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (var customer in FilteredCustomers)
+                        {
+                            <tr>
+
+                                <td>
+                                    <div class="customer-cell">
+
+                                        <div class="customer-avatar">
+                                            @GetInitials(customer)
+                                        </div>
+
+                                        <div>
+                                            <strong>@customer.FullName</strong>
+                                            <span>ID: @customer.Id</span>
+                                        </div>
+
+                                    </div>
+                                </td>
+
+                                <td>@customer.Email</td>
+
+                                <td>@customer.Ci</td>
+
+                                <td>@customer.Phone</td>
+
+                                <td>
+                                    @if (customer.IsActive)
+                                    {
+                                        <span class="status-badge active">
+                                            Activo
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge inactive">
+                                            Inactivo
+                                        </span>
+                                    }
+                                </td>
+
+                                <td>
+                                    <div class="action-buttons">
+
+                                        <button class="btn-edit"
+                                                @onclick="() => OpenEditForm(customer)">
+                                            Editar
+                                        </button>
+
+                                        @if (customer.IsActive)
+                                        {
+                                            <button class="btn-deactivate"
+                                                    @onclick="() => DeactivateCustomerAsync(customer)">
+                                                Desactivar
+                                            </button>
+                                        }
+
+                                    </div>
+                                </td>
+
+                            </tr>
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+        }
+
+    </div>
+
+</div>
+
+
+@code {
+    private List<CustomerDto> customers = new();
+
+    private CreateCustomerRequest createModel = new();
+
+    private UpdateCustomerRequest updateModel = new();
+
+    private int editingCustomerId;
+
+    private bool loading = true;
+    private bool saving = false;
+
+    private bool showCreateForm = false;
+    private bool showEditForm = false;
+
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
+
+    private string? successMessage;
+    private string? errorMessage;
+
+
+    private IEnumerable<CustomerDto> FilteredCustomers
+    {
+        get
+        {
+            IEnumerable<CustomerDto> result = customers;
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var search = searchTerm.Trim();
+
+                result = result.Where(c =>
+                    c.FullName.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                    ||
+                    c.Email.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                    ||
+                    c.Ci.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase));
+            }
+
+            result = statusFilter switch
+            {
+                "active" =>
+                    result.Where(c => c.IsActive),
+
+                "inactive" =>
+                    result.Where(c => !c.IsActive),
+
+                _ => result
+            };
+
+            return result;
+        }
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomersAsync();
+    }
+
+
+    private async Task LoadCustomersAsync()
+    {
+        try
+        {
+            loading = true;
+
+            customers =
+                await CustomerService.GetAllAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "No se pudieron cargar los clientes.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+
+    private void OpenCreateForm()
+    {
+        ClearMessages();
+
+        createModel =
+            new CreateCustomerRequest();
+
+        showEditForm = false;
+        showCreateForm = true;
+    }
+
+
+    private void OpenEditForm(CustomerDto customer)
+    {
+        ClearMessages();
+
+        editingCustomerId = customer.Id;
+
+        updateModel =
+            new UpdateCustomerRequest
+            {
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Email = customer.Email,
+                Ci = customer.Ci,
+                Phone = customer.Phone,
+                IsActive = customer.IsActive
+            };
+
+        showCreateForm = false;
+        showEditForm = true;
+    }
+
+
+    private void CloseForms()
+    {
+        showCreateForm = false;
+        showEditForm = false;
+    }
+
+
+    private async Task CreateCustomerAsync()
+    {
+        ClearMessages();
+
+        try
+        {
+            saving = true;
+
+            var result =
+                await CustomerService.CreateAsync(
+                    createModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo registrar el cliente. Verifica que el correo y CI no estén registrados.";
+
+                return;
+            }
+
+            successMessage =
+                "Cliente registrado correctamente.";
+
+            showCreateForm = false;
+
+            await LoadCustomersAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al registrar el cliente.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+    private async Task UpdateCustomerAsync()
+    {
+        ClearMessages();
+
+        try
+        {
+            saving = true;
+
+            var result =
+                await CustomerService.UpdateAsync(
+                    editingCustomerId,
+                    updateModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo actualizar. Verifica que el correo y CI no estén registrados por otro cliente.";
+
+                return;
+            }
+
+            successMessage =
+                "Cliente actualizado correctamente.";
+
+            showEditForm = false;
+
+            await LoadCustomersAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al actualizar el cliente.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+    private async Task DeactivateCustomerAsync(
+        CustomerDto customer)
+    {
+        ClearMessages();
+
+        try
+        {
+            var result =
+                await CustomerService.DeactivateAsync(
+                    customer.Id);
+
+            if (!result)
+            {
+                errorMessage =
+                    "No se pudo desactivar el cliente.";
+
+                return;
+            }
+
+            successMessage =
+                $"El cliente {customer.FullName} fue desactivado correctamente.";
+
+            await LoadCustomersAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al desactivar el cliente.";
+        }
+    }
+
+
+    private static string GetInitials(
+        CustomerDto customer)
+    {
+        var first =
+            string.IsNullOrWhiteSpace(customer.FirstName)
+                ? ""
+                : customer.FirstName[..1];
+
+        var last =
+            string.IsNullOrWhiteSpace(customer.LastName)
+                ? ""
+                : customer.LastName[..1];
+
+        return $"{first}{last}".ToUpper();
+    }
+
+
+    private void ClearMessages()
+    {
+        successMessage = null;
+        errorMessage = null;
+    }
+}

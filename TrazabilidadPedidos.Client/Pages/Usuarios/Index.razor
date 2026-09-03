@@ -1,0 +1,351 @@
+﻿@page "/usuarios"
+
+@using TrazabilidadPedidos.Client.Services
+@using TrazabilidadPedidos.Shared.DTOs.Users
+
+@inject ManagedUserClientService UserService
+@inject NavigationManager Navigation
+
+<PageTitle>Usuarios</PageTitle>
+
+<div class="users-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Usuarios</h1>
+            <p>Administra los usuarios internos de NovaTec.</p>
+        </div>
+
+        <button class="btn-new"
+                @onclick="NuevoUsuario">
+            + Nuevo usuario
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert-success-custom">
+            @successMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error-custom">
+            @errorMessage
+        </div>
+    }
+
+    <div class="summary-grid">
+
+        <div class="summary-card">
+            <span>TOTAL</span>
+            <strong>@users.Count</strong>
+            <small>Usuarios internos</small>
+        </div>
+
+        <div class="summary-card">
+            <span>ADMINISTRADORES</span>
+            <strong>@users.Count(u => u.Role == "Administrator")</strong>
+            <small>Acceso completo</small>
+        </div>
+
+        <div class="summary-card">
+            <span>OPERADORES</span>
+            <strong>@users.Count(u => u.Role == "Operator")</strong>
+            <small>Personal operativo</small>
+        </div>
+
+        <div class="summary-card">
+            <span>REPARTIDORES</span>
+            <strong>@users.Count(u => u.Role == "DeliveryDriver")</strong>
+            <small>Personal de entrega</small>
+        </div>
+
+    </div>
+
+    <div class="table-card">
+
+        <div class="toolbar">
+
+            <div class="search-box">
+                <span>⌕</span>
+
+                <input type="text"
+                       placeholder="Buscar por nombre, correo o rol..."
+                       @bind="searchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <select class="role-filter"
+                    @bind="roleFilter">
+
+                <option value="all">Todos los roles</option>
+                <option value="Administrator">Administradores</option>
+                <option value="Operator">Operadores</option>
+                <option value="DeliveryDriver">Repartidores</option>
+
+            </select>
+
+        </div>
+
+        @if (loading)
+        {
+            <div class="empty-state">
+                Cargando usuarios...
+            </div>
+        }
+        else if (!FilteredUsers.Any())
+        {
+            <div class="empty-state">
+                <strong>No se encontraron usuarios.</strong>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+
+                <table class="users-table">
+
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Correo</th>
+                            <th>Rol</th>
+                            <th>Teléfono</th>
+                            <th>Disponibilidad</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (var user in FilteredUsers)
+                        {
+                            <tr>
+
+                                <td>
+                                    <div class="user-cell">
+
+                                        <div class="user-avatar">
+                                            @GetInitials(user)
+                                        </div>
+
+                                        <div>
+                                            <strong>@user.FullName</strong>
+                                            <span>ID: @user.Id</span>
+                                        </div>
+
+                                    </div>
+                                </td>
+
+                                <td>@user.Email</td>
+
+                                <td>
+                                    <span class="@GetRoleClass(user.Role)">
+                                        @GetRoleName(user.Role)
+                                    </span>
+                                </td>
+
+                                <td>
+                                    @(string.IsNullOrWhiteSpace(user.Phone)
+                                        ? "—"
+                                        : user.Phone)
+                                </td>
+
+                                <td>
+                                    @if (user.Role == "DeliveryDriver")
+                                    {
+                                        @if (user.IsAvailable == true)
+                                        {
+                                            <span class="availability available">
+                                                Disponible
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="availability unavailable">
+                                                No disponible
+                                            </span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+
+                                <td>
+                                    @if (user.IsActive)
+                                    {
+                                        <span class="status-badge active">
+                                            Activo
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge inactive">
+                                            Inactivo
+                                        </span>
+                                    }
+                                </td>
+
+                                <td>
+                                    <div class="action-buttons">
+
+                                        <button class="btn-edit"
+                                                @onclick="() => EditarUsuario(user.Id)">
+                                            Editar
+                                        </button>
+
+                                        @if (user.IsActive)
+                                        {
+                                            <button class="btn-deactivate"
+                                                    @onclick="() => DeactivateUserAsync(user)">
+                                                Desactivar
+                                            </button>
+                                        }
+
+                                    </div>
+                                </td>
+
+                            </tr>
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+        }
+
+    </div>
+
+</div>
+
+@code {
+
+    private List<ManagedUserDto> users = new();
+
+    private string searchTerm = string.Empty;
+
+    private string roleFilter = "all";
+
+    private bool loading = true;
+
+    private string? successMessage;
+    private string? errorMessage;
+
+    private IEnumerable<ManagedUserDto> FilteredUsers
+    {
+        get
+        {
+            IEnumerable<ManagedUserDto> result = users;
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var search = searchTerm.Trim();
+
+                result = result.Where(u =>
+                    u.FullName.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || u.Email.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || u.Role.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (roleFilter != "all")
+            {
+                result = result.Where(u => u.Role == roleFilter);
+            }
+
+            return result;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            loading = true;
+            users = await UserService.GetAllAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudieron cargar los usuarios.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void NuevoUsuario()
+    {
+        Navigation.NavigateTo("/usuarios/crear");
+    }
+
+    private void EditarUsuario(int id)
+    {
+        Navigation.NavigateTo($"/usuarios/editar/{id}");
+    }
+
+    private async Task DeactivateUserAsync(ManagedUserDto user)
+    {
+        try
+        {
+            var ok = await UserService.DeactivateAsync(user.Id);
+
+            if (ok)
+            {
+                successMessage = $"Usuario {user.FullName} desactivado.";
+                await LoadUsersAsync();
+            }
+            else
+            {
+                errorMessage = "No se pudo desactivar el usuario.";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al desactivar el usuario.";
+        }
+    }
+
+    private static string GetInitials(ManagedUserDto u)
+    {
+        var a = string.IsNullOrWhiteSpace(u.FirstName) ? "" : u.FirstName[..1];
+        var b = string.IsNullOrWhiteSpace(u.LastName) ? "" : u.LastName[..1];
+
+        return $"{a}{b}".ToUpper();
+    }
+
+    private static string GetRoleName(string role) => role switch
+    {
+        "Administrator" => "Administrador",
+        "Operator" => "Operador",
+        "DeliveryDriver" => "Repartidor",
+        _ => role
+    };
+
+    private static string GetRoleClass(string role) => role switch
+    {
+        "Administrator" => "role-badge administrator",
+        "Operator" => "role-badge operator",
+        "DeliveryDriver" => "role-badge driver",
+        _ => "role-badge"
+    };
+
+}

@@ -8,7 +8,7 @@ namespace TrazabilidadPedidos.Shared.Entities
 
         public int OrderId { get; set; }
 
-        public int AddressId { get; set; }
+        public int? AddressId { get; set; }
 
         public int? DeliveryDriverId { get; set; }
 

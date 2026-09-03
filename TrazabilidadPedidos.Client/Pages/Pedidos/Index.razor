@@ -1,0 +1,329 @@
+@page "/pedidos"
+@inject OrderClientService OrderService
+@inject PaymentClientService PaymentService
+@inject NavigationManager Navigation
+
+<PageTitle>Gestión de Pedidos</PageTitle>
+
+<div class="orders-page">
+    <div class="page-header">
+        <h1>Bandeja de Pedidos</h1>
+        <p>Gestiona los pedidos del sistema. Acepta, prepara y despacha.</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert-success">@successMessage</div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando pedidos...</div>
+    }
+    else
+    {
+        <div class="tabs">
+            <button class="tab @(activeTab == "all" ? "active" : "")" @onclick='() => SetTab("all")'>
+                Todos (@allOrders.Count)
+            </button>
+            <button class="tab @(activeTab == "pending" ? "active" : "")" @onclick='() => SetTab("pending")'>
+                Pendientes (@allOrders.Count(o => o.StatusName == "Pendiente"))
+            </button>
+            <button class="tab @(activeTab == "paid" ? "active" : "")" @onclick='() => SetTab("paid")'>
+                Con Pago (@allOrders.Count(o => HasPayment(o.Id)))
+            </button>
+            <button class="tab @(activeTab == "accepted" ? "active" : "")" @onclick='() => SetTab("accepted")'>
+                Aceptados (@allOrders.Count(o => o.StatusName == "Aceptado"))
+            </button>
+            <button class="tab @(activeTab == "preparing" ? "active" : "")" @onclick='() => SetTab("preparing")'>
+                Preparando (@allOrders.Count(o => o.StatusName == "Preparando"))
+            </button>
+            <button class="tab @(activeTab == "ready" ? "active" : "")" @onclick='() => SetTab("ready")'>
+                Listos (@allOrders.Count(o => o.StatusName == "ListoParaEntrega"))
+            </button>
+            <button class="tab @(activeTab == "delivered" ? "active" : "")" @onclick='() => SetTab("delivered")'>
+                Entregados (@allOrders.Count(o => o.StatusName == "Entregado"))
+            </button>
+            <button class="tab @(activeTab == "cancelled" ? "active" : "")" @onclick='() => SetTab("cancelled")'>
+                Cancelados (@allOrders.Count(o => o.StatusName == "Cancelado"))
+            </button>
+        </div>
+
+        <div class="orders-list">
+            @foreach (var order in FilteredOrders)
+            {
+                var paid = HasPayment(order.Id);
+                <div class="order-card">
+                    <div class="order-header">
+                        <div>
+                            <strong>@order.Code</strong>
+                            <span class="status-badge @GetStatusClass(order.StatusName)">@order.StatusName</span>
+                            @if (paid)
+                            {
+                                <span class="badge badge-paid">Pagado</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-unpaid">Sin pago</span>
+                            }
+                        </div>
+                        <span class="order-date">@order.OrderDate.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+                    <div class="order-body">
+                        <div class="order-info-grid">
+                            <div>
+                                <span class="info-label">Cliente:</span>
+                                <span class="info-value">@order.CustomerName</span>
+                            </div>
+                            <div>
+                                <span class="info-label">Total:</span>
+                                <span class="info-value total-amount">Bs @order.Total.ToString("N2")</span>
+                            </div>
+                            <div>
+                                <span class="info-label">Items:</span>
+                                <span class="info-value">@order.Details.Count producto(s)</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(order.DeliveryAddress))
+                            {
+                                <div>
+                                    <span class="info-label">Entrega:</span>
+                                    <span class="info-value">@order.DeliveryAddress</span>
+                                </div>
+                            }
+                        </div>
+
+                        @if (order.DeliveryLatitude.HasValue && order.DeliveryLongitude.HasValue)
+                        {
+                            <div class="order-map-preview">
+                                <OrderMap Latitude="@order.DeliveryLatitude.Value"
+                                          Longitude="@order.DeliveryLongitude.Value"
+                                          Zoom="14" />
+                            </div>
+                        }
+                    </div>
+                    <div class="order-actions">
+                        <button class="btn-view" @onclick="() => ViewOrder(order.Id)">Ver detalle</button>
+
+                        @if (order.StatusName == "Pendiente" && paid)
+                        {
+                            <button class="btn-approve"
+                                    @onclick="() => AcceptOrder(order.Id)"
+                                    disabled="@(processingId == order.Id)">
+                                @(processingId == order.Id ? "Aceptando..." : "Aceptar pedido")
+                            </button>
+                        }
+                        @if (order.StatusName == "Pendiente" && !paid)
+                        {
+                            <span class="action-hint">Esperando pago</span>
+                        }
+                        @if (order.StatusName == "Pendiente")
+                        {
+                            <button class="btn-reject"
+                                    @onclick="() => CancelOrder(order.Id)"
+                                    disabled="@(processingId == order.Id)">
+                                Cancelar
+                            </button>
+                        }
+                        @if (order.StatusName == "Aceptado")
+                        {
+                            <button class="btn-prepare"
+                                    @onclick="() => UpdateStatus(order.Id, 3, null)"
+                                    disabled="@(processingId == order.Id)">
+                                Preparar
+                            </button>
+                        }
+                        @if (order.StatusName == "Preparando")
+                        {
+                            <button class="btn-ready"
+                                    @onclick="() => UpdateStatus(order.Id, 4, null)"
+                                    disabled="@(processingId == order.Id)">
+                                Listo para entrega
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!FilteredOrders.Any())
+            {
+                <div class="empty-state">No hay pedidos en esta categoría.</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<OrderDto> allOrders = new();
+    private List<int> paidOrderIds = new();
+    private bool loading = true;
+    private string activeTab = "all";
+    private string? errorMessage;
+    private string? successMessage;
+    private int? processingId;
+
+    private IEnumerable<OrderDto> FilteredOrders => activeTab switch
+    {
+        "pending" => allOrders.Where(o => o.StatusName == "Pendiente"),
+        "paid" => allOrders.Where(o => HasPayment(o.Id) && o.StatusName != "Entregado" && o.StatusName != "Cancelado"),
+        "accepted" => allOrders.Where(o => o.StatusName == "Aceptado"),
+        "preparing" => allOrders.Where(o => o.StatusName == "Preparando"),
+        "ready" => allOrders.Where(o => o.StatusName == "ListoParaEntrega"),
+        "delivered" => allOrders.Where(o => o.StatusName == "Entregado"),
+        "cancelled" => allOrders.Where(o => o.StatusName == "Cancelado"),
+        _ => allOrders
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        try
+        {
+            loading = true;
+            allOrders = await OrderService.GetAllAsync();
+            await LoadPaymentStatus();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            allOrders = new();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task LoadPaymentStatus()
+    {
+        try
+        {
+            var payments = await PaymentService.GetAllAsync();
+            paidOrderIds = payments
+                .Where(p => p.Status == "Confirmed")
+                .Select(p => p.OrderId)
+                .Distinct()
+                .ToList();
+        }
+        catch
+        {
+            paidOrderIds = new();
+        }
+    }
+
+    private bool HasPayment(int orderId) => paidOrderIds.Contains(orderId);
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+    }
+
+    private void ViewOrder(int orderId)
+    {
+        Navigation.NavigateTo($"/mis-pedidos/{orderId}");
+    }
+
+    private async Task AcceptOrder(int orderId)
+    {
+        processingId = orderId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await OrderService.AcceptAsync(orderId);
+            if (result)
+            {
+                successMessage = "Pedido aceptado correctamente. Inventario descontado.";
+                await LoadOrders();
+            }
+            else
+            {
+                errorMessage = "No se pudo aceptar el pedido.";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al aceptar el pedido.";
+        }
+        finally
+        {
+            processingId = null;
+        }
+    }
+
+    private async Task UpdateStatus(int orderId, int statusId, string? observation)
+    {
+        processingId = orderId;
+        errorMessage = null;
+
+        try
+        {
+            await OrderService.UpdateStatusAsync(orderId, statusId, observation);
+            await LoadOrders();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al actualizar el estado.";
+        }
+        finally
+        {
+            processingId = null;
+        }
+    }
+
+    private async Task CancelOrder(int orderId)
+    {
+        processingId = orderId;
+        errorMessage = null;
+
+        try
+        {
+            await OrderService.UpdateStatusAsync(orderId, 7, "Cancelado por el operador");
+            await LoadOrders();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al cancelar el pedido.";
+        }
+        finally
+        {
+            processingId = null;
+        }
+    }
+
+    private string GetStatusClass(string status) => status switch
+    {
+        "Pendiente" => "status-pending",
+        "Aceptado" => "status-accepted",
+        "Preparando" => "status-preparing",
+        "ListoParaEntrega" => "status-ready",
+        "EnCamino" => "status-transit",
+        "Entregado" => "status-delivered",
+        "Cancelado" => "status-cancelled",
+        _ => ""
+    };
+}

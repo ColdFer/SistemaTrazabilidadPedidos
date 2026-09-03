@@ -1,0 +1,169 @@
+@page "/mi-perfil"
+@inject ProfileClientService ProfileService
+@inject NavigationManager Navigation
+
+<PageTitle>Mi Perfil</PageTitle>
+
+<div class="profile-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Mi Perfil</h1>
+            <p>Administra tu información personal.</p>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando perfil...</div>
+    }
+    else if (profile == null)
+    {
+        <div class="empty-box">
+            <strong>No se pudo cargar el perfil.</strong>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert-success">@successMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert-error">@errorMessage</div>
+        }
+
+        <div class="form-card">
+            <EditForm Model="model" OnValidSubmit="SaveProfile">
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Nombre</label>
+                        <InputText class="form-control" @bind-Value="model.FirstName" />
+                        <ValidationMessage For="@(() => model.FirstName)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Apellido</label>
+                        <InputText class="form-control" @bind-Value="model.LastName" />
+                        <ValidationMessage For="@(() => model.LastName)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Correo electrónico</label>
+                        <input class="form-control" value="@profile.Email" disabled />
+                    </div>
+
+                    <div class="form-group">
+                        <label>CI</label>
+                        <input class="form-control" value="@profile.Ci" disabled />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <InputText class="form-control" @bind-Value="model.Phone" />
+                        <ValidationMessage For="@(() => model.Phone)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Dirección</label>
+                        <InputText class="form-control" @bind-Value="model.Address" />
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-save" disabled="@saving">
+                        @(saving ? "Guardando..." : "Guardar cambios")
+                    </button>
+                </div>
+
+            </EditForm>
+        </div>
+    }
+
+</div>
+
+@code {
+    private ProfileDto? profile;
+    private UpdateProfileRequest model = new();
+    private bool loading = true;
+    private bool saving;
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        try
+        {
+            loading = true;
+            profile = await ProfileService.GetProfileAsync();
+
+            if (profile != null)
+            {
+                model = new UpdateProfileRequest
+                {
+                    FirstName = profile.FirstName,
+                    LastName = profile.LastName,
+                    Phone = profile.Phone,
+                    Address = profile.Address
+                };
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudo cargar el perfil.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        saving = true;
+        successMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            var result = await ProfileService.UpdateProfileAsync(model);
+
+            if (result)
+            {
+                successMessage = "Perfil actualizado correctamente.";
+                await LoadProfile();
+            }
+            else
+            {
+                errorMessage = "No se pudo actualizar el perfil.";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al guardar el perfil.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

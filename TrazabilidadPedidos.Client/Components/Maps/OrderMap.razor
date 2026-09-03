@@ -1,0 +1,42 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="order-map-container">
+    <div id="@mapContainerId" style="height: 350px; border-radius: 12px; border: 1px solid #e0e6ed;"></div>
+    @if (Latitude != 0 && Longitude != 0)
+    {
+        <div class="map-actions" style="margin-top: 8px; text-align: right;">
+            <a href="https://www.google.com/maps?q=@Latitude,@Longitude" target="_blank"
+               class="btn-google-maps">
+                📍 Abrir en Google Maps
+            </a>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public double Latitude { get; set; } = -17.7833;
+    [Parameter] public double Longitude { get; set; } = -63.1821;
+    [Parameter] public int Zoom { get; set; } = 14;
+
+    private string mapContainerId = $"ordermap_{Guid.NewGuid():N}";
+    private bool mapInitialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("leafletInterop.initReadOnlyMap",
+                mapContainerId, Latitude, Longitude, Zoom);
+            mapInitialized = true;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletInterop.destroyMap", mapContainerId);
+        }
+    }
+}

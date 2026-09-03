@@ -1,0 +1,616 @@
+﻿@page "/reportes"
+@inject ReportClientService ReportService
+@inject NavigationManager Navigation
+
+<PageTitle>Reportes</PageTitle>
+
+<div class="reports-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Reportes</h1>
+            <p>Estadisticas y metricas del sistema.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    <div class="report-tabs">
+        <button class="tab @(activeTab == "dashboard" ? "active" : "")" @onclick='() => SwitchTab("dashboard")'>Dashboard</button>
+        <button class="tab @(activeTab == "ventas" ? "active" : "")" @onclick='() => SwitchTab("ventas")'>Ventas por Periodo</button>
+        <button class="tab @(activeTab == "productos" ? "active" : "")" @onclick='() => SwitchTab("productos")'>Productos Top</button>
+        <button class="tab @(activeTab == "estados" ? "active" : "")" @onclick='() => SwitchTab("estados")'>Pedidos por Estado</button>
+        <button class="tab @(activeTab == "clientes" ? "active" : "")" @onclick='() => SwitchTab("clientes")'>Clientes Frecuentes</button>
+        <button class="tab @(activeTab == "repartidores" ? "active" : "")" @onclick='() => SwitchTab("repartidores")'>Repartidores</button>
+        <button class="tab @(activeTab == "inventario" ? "active" : "")" @onclick='() => SwitchTab("inventario")'>Inventario</button>
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando reporte...</div>
+    }
+    else
+    {
+        @if (activeTab == "dashboard")
+        {
+            <div class="summary-grid">
+                <div class="summary-card blue">
+                    <span>PEDIDOS TOTALES</span>
+                    <strong>@dashboardReport?.TotalOrders</strong>
+                </div>
+                <div class="summary-card yellow">
+                    <span>PENDIENTES</span>
+                    <strong>@dashboardReport?.PendingOrders</strong>
+                </div>
+                <div class="summary-card green">
+                    <span>ENTREGADOS</span>
+                    <strong>@dashboardReport?.DeliveredOrders</strong>
+                </div>
+                <div class="summary-card purple">
+                    <span>VENTAS TOTALES</span>
+                    <strong>Bs @(dashboardReport?.TotalSales.ToString("N2") ?? "0")</strong>
+                </div>
+            </div>
+
+            <div class="summary-grid secondary">
+                <div class="summary-card">
+                    <span>PRODUCTOS</span>
+                    <strong>@dashboardReport?.TotalProducts</strong>
+                    <small>Activos en catalogo</small>
+                </div>
+                <div class="summary-card">
+                    <span>STOCK BAJO</span>
+                    <strong>@dashboardReport?.LowStockProducts</strong>
+                    <small>Menos de 5 unidades</small>
+                </div>
+                <div class="summary-card">
+                    <span>CLIENTES</span>
+                    <strong>@dashboardReport?.TotalCustomers</strong>
+                    <small>Registrados</small>
+                </div>
+            </div>
+
+            <div class="reports-grid">
+                <div class="report-card">
+                    <h3>Ventas por mes</h3>
+                    @if (dashboardReport?.SalesByMonth.Any() == true)
+                    {
+                        <div class="chart-bars">
+                            @foreach (var item in dashboardReport.SalesByMonth)
+                            {
+                                <div class="bar-row">
+                                    <span class="bar-label">@item.Month</span>
+                                    <div class="bar-track">
+                                        <div class="bar-fill" style="width: @GetBarWidth(item.Total)%"></div>
+                                    </div>
+                                    <span class="bar-value">Bs @item.Total.ToString("N0")</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No hay datos de ventas disponibles.</p>
+                    }
+                </div>
+
+                <div class="report-card">
+                    <h3>Productos mas vendidos</h3>
+                    @if (dashboardReport?.TopProducts.Any() == true)
+                    {
+                        <div class="top-list">
+                            @{ var rank = 1; }
+                            @foreach (var product in dashboardReport.TopProducts)
+                            {
+                                <div class="top-item">
+                                    <span class="rank">@rank</span>
+                                    <div class="top-info">
+                                        <strong>@product.ProductName</strong>
+                                        <span>@product.TotalSold unidades - Bs @product.Revenue.ToString("N0")</span>
+                                    </div>
+                                </div>
+                                rank++;
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No hay datos de ventas disponibles.</p>
+                    }
+                </div>
+
+                <div class="report-card">
+                    <h3>Stock bajo</h3>
+                    @if (dashboardReport?.LowStockItems.Any() == true)
+                    {
+                        <div class="low-stock-list">
+                            @foreach (var item in dashboardReport.LowStockItems)
+                            {
+                                <div class="low-stock-item">
+                                    <div class="stock-info">
+                                        <strong>@item.ProductName</strong>
+                                        <span>@item.ProductCode</span>
+                                    </div>
+                                    <span class="stock-count @(item.CurrentStock == 0 ? "critical" : "warning")">
+                                        @item.CurrentStock
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">Todos los productos tienen stock suficiente.</p>
+                    }
+                </div>
+            </div>
+        }
+        else if (activeTab == "ventas")
+        {
+            <div class="filter-bar">
+                <label>Desde:</label>
+                <input type="date" @bind="startDate" />
+                <label>Hasta:</label>
+                <input type="date" @bind="endDate" />
+                <button class="btn-primary" @onclick="LoadSalesReport">Filtrar</button>
+                <button class="btn-secondary" @onclick="ExportSalesCsv">Exportar CSV</button>
+            </div>
+
+            @if (salesReport != null)
+            {
+                <div class="summary-grid">
+                    <div class="summary-card green">
+                        <span>VENTAS TOTALES</span>
+                        <strong>Bs @salesReport.TotalSales.ToString("N2")</strong>
+                    </div>
+                    <div class="summary-card blue">
+                        <span>PEDIDOS</span>
+                        <strong>@salesReport.TotalOrders</strong>
+                    </div>
+                    <div class="summary-card purple">
+                        <span>TICKET PROMEDIO</span>
+                        <strong>Bs @salesReport.AverageTicket.ToString("N2")</strong>
+                    </div>
+                </div>
+
+                @if (salesReport.SalesByDay.Any())
+                {
+                    <div class="report-card">
+                        <h3>Ventas por dia</h3>
+                        <div class="chart-bars">
+                            @foreach (var item in salesReport.SalesByDay)
+                            {
+                                <div class="bar-row">
+                                    <span class="bar-label">@item.Month</span>
+                                    <div class="bar-track">
+                                        <div class="bar-fill" style="width: @GetBarWidthSales(item.Total)%"></div>
+                                    </div>
+                                    <span class="bar-value">Bs @item.Total.ToString("N0")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        }
+        else if (activeTab == "productos")
+        {
+            <div class="filter-bar">
+                <label>Mostrar top:</label>
+                <select @bind="topProductsLimit">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                </select>
+                <button class="btn-primary" @onclick="LoadTopProducts">Actualizar</button>
+                <button class="btn-secondary" @onclick="ExportTopProductsCsv">Exportar CSV</button>
+            </div>
+
+            @if (topProductsReport?.Products.Any() == true)
+            {
+                <div class="report-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Producto</th>
+                                <th>Unidades vendidas</th>
+                                <th>Ingresos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ var rank = 1; }
+                            @foreach (var p in topProductsReport.Products)
+                            {
+                                <tr>
+                                    <td>@rank</td>
+                                    <td>@p.ProductName</td>
+                                    <td>@p.TotalSold</td>
+                                    <td>Bs @p.Revenue.ToString("N2")</td>
+                                </tr>
+                                rank++;
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else if (activeTab == "estados")
+        {
+            <div class="filter-bar">
+                <button class="btn-primary" @onclick="LoadOrdersByStatus">Actualizar</button>
+                <button class="btn-secondary" @onclick="ExportOrdersByStatusCsv">Exportar CSV</button>
+            </div>
+
+            @if (ordersByStatusReport != null)
+            {
+                <div class="summary-grid">
+                    <div class="summary-card blue">
+                        <span>TOTAL PEDIDOS</span>
+                        <strong>@ordersByStatusReport.Total</strong>
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Estado</th>
+                                <th>Cantidad</th>
+                                <th>Porcentaje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in ordersByStatusReport.Items)
+                            {
+                                <tr>
+                                    <td>@item.StatusName</td>
+                                    <td>@item.Count</td>
+                                    <td>@item.Percentage%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else if (activeTab == "clientes")
+        {
+            <div class="filter-bar">
+                <label>Mostrar top:</label>
+                <select @bind="topCustomersLimit">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                </select>
+                <button class="btn-primary" @onclick="LoadTopCustomers">Actualizar</button>
+                <button class="btn-secondary" @onclick="ExportTopCustomersCsv">Exportar CSV</button>
+            </div>
+
+            @if (topCustomersReport?.Customers.Any() == true)
+            {
+                <div class="report-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Cliente</th>
+                                <th>Pedidos</th>
+                                <th>Total gastado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ var rank = 1; }
+                            @foreach (var c in topCustomersReport.Customers)
+                            {
+                                <tr>
+                                    <td>@rank</td>
+                                    <td>@c.CustomerName</td>
+                                    <td>@c.TotalOrders</td>
+                                    <td>Bs @c.TotalSpent.ToString("N2")</td>
+                                </tr>
+                                rank++;
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else if (activeTab == "repartidores")
+        {
+            <div class="filter-bar">
+                <button class="btn-primary" @onclick="LoadDriverPerformance">Actualizar</button>
+                <button class="btn-secondary" @onclick="ExportDriverPerformanceCsv">Exportar CSV</button>
+            </div>
+
+            @if (driverReport?.Drivers.Any() == true)
+            {
+                <div class="report-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Repartidor</th>
+                                <th>Total entregas</th>
+                                <th>Completadas</th>
+                                <th>Fallidas</th>
+                                <th>Tasa exito</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in driverReport.Drivers)
+                            {
+                                <tr>
+                                    <td>@d.DriverName</td>
+                                    <td>@d.TotalDeliveries</td>
+                                    <td>@d.Completed</td>
+                                    <td>@d.Failed</td>
+                                    <td>@d.SuccessRate%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else if (activeTab == "inventario")
+        {
+            <div class="filter-bar">
+                <button class="btn-primary" @onclick="LoadInventory">Actualizar</button>
+                <button class="btn-secondary" @onclick="ExportInventoryCsv">Exportar CSV</button>
+            </div>
+
+            @if (inventoryReport != null)
+            {
+                <div class="summary-grid">
+                    <div class="summary-card blue">
+                        <span>TOTAL PRODUCTOS</span>
+                        <strong>@inventoryReport.TotalProducts</strong>
+                    </div>
+                    <div class="summary-card yellow">
+                        <span>STOCK BAJO</span>
+                        <strong>@inventoryReport.LowStockCount</strong>
+                    </div>
+                    <div class="summary-card red">
+                        <span>AGOTADOS</span>
+                        <strong>@inventoryReport.OutOfStockCount</strong>
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Codigo</th>
+                                <th>Categoria</th>
+                                <th>Stock actual</th>
+                                <th>Stock minimo</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in inventoryReport.Items)
+                            {
+                                <tr>
+                                    <td>@item.ProductName</td>
+                                    <td>@item.ProductCode</td>
+                                    <td>@item.CategoryName</td>
+                                    <td>@item.CurrentStock</td>
+                                    <td>@item.MinStock</td>
+                                    <td class="status-@item.Status.ToLower()">@item.Status</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    }
+
+</div>
+
+@code {
+    private string activeTab = "dashboard";
+    private bool loading = true;
+    private string? errorMessage;
+
+    private DashboardReportDto? dashboardReport;
+    private SalesByPeriodReportDto? salesReport;
+    private TopProductsReportDto? topProductsReport;
+    private OrdersByStatusReportDto? ordersByStatusReport;
+    private TopCustomersReportDto? topCustomersReport;
+    private DriverPerformanceReportDto? driverReport;
+    private InventoryReportDto? inventoryReport;
+
+    private DateTime startDate = DateTime.Now.AddMonths(-1);
+    private DateTime endDate = DateTime.Now;
+    private int topProductsLimit = 10;
+    private int topCustomersLimit = 10;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            loading = true;
+            await LoadDashboard();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al cargar el reporte.";
+            loading = false;
+        }
+    }
+
+    private async Task SwitchTab(string tab)
+    {
+        activeTab = tab;
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            switch (tab)
+            {
+                case "dashboard":
+                    await LoadDashboard();
+                    break;
+                case "ventas":
+                    await LoadSalesReport();
+                    break;
+                case "productos":
+                    await LoadTopProducts();
+                    break;
+                case "estados":
+                    await LoadOrdersByStatus();
+                    break;
+                case "clientes":
+                    await LoadTopCustomers();
+                    break;
+                case "repartidores":
+                    await LoadDriverPerformance();
+                    break;
+                case "inventario":
+                    await LoadInventory();
+                    break;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al cargar el reporte.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task LoadDashboard()
+    {
+        dashboardReport = await ReportService.GetDashboardReportAsync();
+        loading = false;
+    }
+
+    private async Task LoadSalesReport()
+    {
+        salesReport = await ReportService.GetSalesByPeriodAsync(startDate, endDate);
+    }
+
+    private async Task LoadTopProducts()
+    {
+        topProductsReport = await ReportService.GetTopProductsAsync(topProductsLimit);
+    }
+
+    private async Task LoadOrdersByStatus()
+    {
+        ordersByStatusReport = await ReportService.GetOrdersByStatusAsync();
+    }
+
+    private async Task LoadTopCustomers()
+    {
+        topCustomersReport = await ReportService.GetTopCustomersAsync(topCustomersLimit);
+    }
+
+    private async Task LoadDriverPerformance()
+    {
+        driverReport = await ReportService.GetDriverPerformanceAsync();
+    }
+
+    private async Task LoadInventory()
+    {
+        inventoryReport = await ReportService.GetInventoryReportAsync();
+    }
+
+    private double GetBarWidth(decimal value)
+    {
+        if (dashboardReport == null || !dashboardReport.SalesByMonth.Any()) return 0;
+        var max = dashboardReport.SalesByMonth.Max(s => s.Total);
+        if (max == 0) return 0;
+        return (double)(value / max) * 100;
+    }
+
+    private double GetBarWidthSales(decimal value)
+    {
+        if (salesReport == null || !salesReport.SalesByDay.Any()) return 0;
+        var max = salesReport.SalesByDay.Max(s => s.Total);
+        if (max == 0) return 0;
+        return (double)(value / max) * 100;
+    }
+
+    private string BuildCsv(string header, IEnumerable<string[]> rows)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(header);
+        foreach (var row in rows)
+        {
+            sb.AppendLine(string.Join(",", row.Select(r => $"\"{r}\"")));
+        }
+        return sb.ToString();
+    }
+
+    private async Task DownloadCsv(string filename, string csvContent)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+        await JS.InvokeVoidAsync("downloadFile", filename, bytes);
+    }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private async Task ExportSalesCsv()
+    {
+        if (salesReport == null) return;
+        var csv = BuildCsv("Fecha,Total,Pedidos",
+            salesReport.SalesByDay.Select(s => new[] { s.Month, s.Total.ToString("N2"), s.OrderCount.ToString() }));
+        await DownloadCsv("ventas_por_periodo.csv", csv);
+    }
+
+    private async Task ExportTopProductsCsv()
+    {
+        if (topProductsReport == null) return;
+        var csv = BuildCsv("Producto,Unidades Vendidas,Ingresos",
+            topProductsReport.Products.Select(p => new[] { p.ProductName, p.TotalSold.ToString(), p.Revenue.ToString("N2") }));
+        await DownloadCsv("productos_top.csv", csv);
+    }
+
+    private async Task ExportOrdersByStatusCsv()
+    {
+        if (ordersByStatusReport == null) return;
+        var csv = BuildCsv("Estado,Cantidad,Porcentaje",
+            ordersByStatusReport.Items.Select(i => new[] { i.StatusName, i.Count.ToString(), i.Percentage.ToString() + "%" }));
+        await DownloadCsv("pedidos_por_estado.csv", csv);
+    }
+
+    private async Task ExportTopCustomersCsv()
+    {
+        if (topCustomersReport == null) return;
+        var csv = BuildCsv("Cliente,Pedidos,Total Gastado",
+            topCustomersReport.Customers.Select(c => new[] { c.CustomerName, c.TotalOrders.ToString(), c.TotalSpent.ToString("N2") }));
+        await DownloadCsv("clientes_frecuentes.csv", csv);
+    }
+
+    private async Task ExportDriverPerformanceCsv()
+    {
+        if (driverReport == null) return;
+        var csv = BuildCsv("Repartidor,Total Entregas,Completadas,Fallidas,Tasa Exito",
+            driverReport.Drivers.Select(d => new[] { d.DriverName, d.TotalDeliveries.ToString(), d.Completed.ToString(), d.Failed.ToString(), d.SuccessRate.ToString() + "%" }));
+        await DownloadCsv("repartidores.csv", csv);
+    }
+
+    private async Task ExportInventoryCsv()
+    {
+        if (inventoryReport == null) return;
+        var csv = BuildCsv("Producto,Codigo,Categoria,Stock Actual,Stock Minimo,Estado",
+            inventoryReport.Items.Select(i => new[] { i.ProductName, i.ProductCode, i.CategoryName, i.CurrentStock.ToString(), i.MinStock.ToString(), i.Status }));
+        await DownloadCsv("inventario.csv", csv);
+    }
+}

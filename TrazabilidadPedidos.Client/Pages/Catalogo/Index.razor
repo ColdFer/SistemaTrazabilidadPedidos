@@ -1,0 +1,162 @@
+@page "/catalogo"
+@inject InventoryClientService InventoryService
+@inject NavigationManager Navigation
+
+<PageTitle>Catálogo</PageTitle>
+
+<div class="catalog-page">
+
+    <div class="catalog-header">
+        <div>
+            <h1>Catálogo de Productos</h1>
+            <p>Explora nuestros productos tecnológicos disponibles.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    <div class="catalog-toolbar">
+        <div class="search-box">
+            <span>⌕</span>
+            <input type="text" placeholder="Buscar productos..."
+                   @bind="searchTerm" @bind:event="oninput" />
+        </div>
+
+        <select class="category-filter" @bind="categoryFilter">
+            <option value="all">Todas las categorías</option>
+            @foreach (var cat in categories)
+            {
+                <option value="@cat.Id">@cat.Name</option>
+            }
+        </select>
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando productos...</div>
+    }
+    else if (!FilteredProducts.Any())
+    {
+        <div class="empty-box">
+            <strong>No se encontraron productos.</strong>
+            <span>Intenta con otros términos de búsqueda.</span>
+        </div>
+    }
+    else
+    {
+        <div class="product-grid">
+            @foreach (var product in FilteredProducts)
+            {
+                <div class="product-card" @onclick="() => VerDetalle(product.Id)">
+                    <div class="product-image">
+                        @if (!string.IsNullOrWhiteSpace(product.Image))
+                        {
+                            <img src="@product.Image" alt="@product.Name" />
+                        }
+                        else
+                        {
+                            <div class="image-placeholder">
+                                @(string.IsNullOrEmpty(product.Name) ? "?" : product.Name[..1].ToUpper())
+                            </div>
+                        }
+                    </div>
+
+                    <div class="product-info">
+                        <span class="product-category">@product.CategoryName</span>
+                        <h3>@product.Name</h3>
+                        <p class="product-price">Bs @product.Price.ToString("N2")</p>
+
+                        <div class="product-meta">
+                            @if (product.CurrentStock > 0)
+                            {
+                                <span class="stock-badge in-stock">
+                                    Stock: @product.CurrentStock
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="stock-badge out-of-stock">
+                                    Sin stock
+                                </span>
+                            }
+                        </div>
+
+                        <button class="btn-detail"
+                                @onclick="() => VerDetalle(product.Id)"
+                                disabled="@(product.CurrentStock == 0)">
+                            @(product.CurrentStock > 0 ? "Ver detalle" : "Agotado")
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+    private List<ProductDto> products = new();
+    private List<CategoryDto> categories = new();
+    private bool loading = true;
+    private string searchTerm = string.Empty;
+    private string categoryFilter = "all";
+    private string? errorMessage;
+
+    private IEnumerable<ProductDto> FilteredProducts
+    {
+        get
+        {
+            IEnumerable<ProductDto> result = products.Where(p => p.IsActive);
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var search = searchTerm.Trim();
+                result = result.Where(p =>
+                    p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    p.Description != null && p.Description.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (categoryFilter != "all" && int.TryParse(categoryFilter, out var catId))
+            {
+                result = result.Where(p => p.CategoryId == catId);
+            }
+
+            return result;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            loading = true;
+            products = await InventoryService.GetProductsAsync();
+            categories = await InventoryService.GetCategoriesAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudieron cargar los productos.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void VerDetalle(int productId)
+    {
+        Navigation.NavigateTo($"/catalogo/{productId}");
+    }
+}

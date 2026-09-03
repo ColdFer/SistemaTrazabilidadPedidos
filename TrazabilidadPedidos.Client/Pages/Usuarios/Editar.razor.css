@@ -1,0 +1,146 @@
+﻿.edit-page {
+    max-width: 900px;
+    margin: auto;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+    .page-header h1 {
+        margin: 0;
+        color: #17324d;
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    .page-header p {
+        margin-top: 6px;
+        color: #748396;
+    }
+
+.btn-back {
+    background: white;
+    border: 1px solid #d9e0ea;
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+}
+
+.form-card {
+    background: white;
+    border: 1px solid #e5ebf1;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 8px 22px rgba(22,39,61,.05);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.full-width {
+    grid-column: 1/-1;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+    .form-group label {
+        font-weight: 700;
+        font-size: 13px;
+        margin-bottom: 8px;
+        color: #41556f;
+    }
+
+.form-control {
+    border: 1px solid #d7dee8;
+    border-radius: 8px;
+    padding: 11px 12px;
+    font-size: 14px;
+}
+
+    .form-control:focus {
+        outline: none;
+        border-color: #3478d4;
+        box-shadow: 0 0 0 3px rgba(52,120,212,.12);
+    }
+
+    .form-control:disabled {
+        background: #f3f5f7;
+        color: #7d8795;
+    }
+
+.checkbox-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.help {
+    color: #7e8b99;
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+.btn-cancel {
+    background: white;
+    border: 1px solid #d8e0ea;
+    border-radius: 8px;
+    padding: 11px 18px;
+    cursor: pointer;
+}
+
+.btn-save {
+    background: #3478d4;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.alert-error {
+    background: #fff1f1;
+    border: 1px solid #efcaca;
+    color: #b03b3b;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 18px;
+}
+
+.loading-box {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    color: #758293;
+}
+
+@media(max-width:768px) {
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -16,6 +16,14 @@
 
         public string? Observation { get; set; }
 
+        public double? DeliveryLatitude { get; set; }
+
+        public double? DeliveryLongitude { get; set; }
+
+        public string? DeliveryAddress { get; set; }
+
+        public string? DeliveryReference { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         public DateTime UpdatedAt { get; set; } = DateTime.Now;

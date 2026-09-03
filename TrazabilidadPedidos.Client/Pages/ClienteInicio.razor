@@ -1,0 +1,99 @@
+﻿@page "/cliente/inicio"
+
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+<PageTitle>Inicio</PageTitle>
+
+<div class="customer-page">
+
+    <div class="welcome-card">
+        <div>
+            <span>BIENVENIDO</span>
+            <h1>@userName</h1>
+            <p>
+                Consulta productos, realiza tus pedidos
+                y revisa el estado de tus entregas.
+            </p>
+        </div>
+    </div>
+
+    <div class="customer-options">
+
+        <NavLink class="option-card" href="catalogo">
+            <div class="option-icon">P</div>
+
+            <div>
+                <span>TIENDA</span>
+                <h3>Productos</h3>
+
+                <p>
+                    Explora los productos tecnológicos
+                    disponibles.
+                </p>
+            </div>
+        </NavLink>
+
+        <NavLink class="option-card" href="carrito">
+            <div class="option-icon cart-icon">🛒</div>
+
+            <div>
+                <span>CARRITO</span>
+                <h3>Mi carrito</h3>
+
+                <p>
+                    Revisa los productos que deseas
+                    comprar.
+                </p>
+            </div>
+        </NavLink>
+
+        <NavLink class="option-card" href="mis-pedidos">
+            <div class="option-icon">M</div>
+
+            <div>
+                <span>PEDIDOS</span>
+                <h3>Mis pedidos</h3>
+
+                <p>
+                    Consulta tus compras y su estado
+                    actual.
+                </p>
+            </div>
+        </NavLink>
+
+        <NavLink class="option-card" href="mi-perfil">
+            <div class="option-icon">U</div>
+
+            <div>
+                <span>CUENTA</span>
+                <h3>Mi perfil</h3>
+
+                <p>
+                    Administra tu información personal
+                    y direcciones.
+                </p>
+            </div>
+        </NavLink>
+
+    </div>
+
+</div>
+
+@code {
+    private string userName = "Cliente";
+
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
+    {
+        if (firstRender)
+        {
+            userName =
+                await JS.InvokeAsync<string>(
+                    "localStorage.getItem",
+                    "userName")
+                ?? "Cliente";
+
+            StateHasChanged();
+        }
+    }
+}

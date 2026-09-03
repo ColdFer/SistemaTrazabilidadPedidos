@@ -1,0 +1,349 @@
+@page "/pagos/seleccionar/{OrderId:int}"
+@inject PaymentClientService PaymentService
+@inject OrderClientService OrderService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Forma de Pago</PageTitle>
+
+<div class="payment-page">
+    <div class="page-header">
+        <div>
+            <h1>Forma de Pago</h1>
+            <p>Elige como deseas pagar tu pedido #@OrderId.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando datos del pedido...</div>
+    }
+    else if (paymentCreated)
+    {
+        <div class="payment-success">
+            <div class="success-icon">V</div>
+            <strong>Pago registrado correctamente</strong>
+            <p>@(selectedMethod == 3 ? "Pago en efectivo registrado. Confirma tu entrega." : "Tu pago fue procesado exitosamente.")</p>
+            <p class="payment-detail">Codigo de transaccion: <strong>@transactionCode</strong></p>
+            <button class="btn-primary" @onclick="GoToOrder">Ver mi pedido</button>
+        </div>
+    }
+    else
+    {
+        <div class="payment-content">
+            <div class="method-grid">
+                <div class="method-card @(selectedMethod == 3 ? "selected" : "")"
+                     @onclick="() => SelectMethod(3)">
+                    <div class="method-icon cash-icon">E</div>
+                    <strong>Pago en Efectivo</strong>
+                    <p>Pago rapido de prueba. Se confirma automaticamente.</p>
+                </div>
+                <div class="method-card @(selectedMethod == 4 ? "selected" : "")"
+                     @onclick="() => SelectMethod(4)">
+                    <div class="method-icon card-icon">T</div>
+                    <strong>Tarjeta</strong>
+                    <p>Credito o debito. Visa, Mastercard.</p>
+                </div>
+                <div class="method-card @(selectedMethod == 1 ? "selected" : "")"
+                     @onclick="() => SelectMethod(1)">
+                    <div class="method-icon qr-icon">Q</div>
+                    <strong>Pago QR</strong>
+                    <p>Escanea el codigo QR con tu app bancaria.</p>
+                </div>
+                <div class="method-card @(selectedMethod == 2 ? "selected" : "")"
+                     @onclick="() => SelectMethod(2)">
+                    <div class="method-icon transfer-icon">B</div>
+                    <strong>Transferencia</strong>
+                    <p>Deposita o transfiere a nuestra cuenta.</p>
+                </div>
+            </div>
+
+            @* === EFECTIVO === *@
+            @if (selectedMethod == 3)
+            {
+                <div class="detail-section">
+                    <h3>Pago en Efectivo</h3>
+                    <div class="cash-info">
+                        <p>El pago en efectivo se confirma automaticamente al presionar "Confirmar pago".</p>
+                        <p>El repartidor cobrara <strong>Bs @orderTotal.ToString("N2")</strong> en la entrega.</p>
+                    </div>
+                </div>
+            }
+
+            @* === TARJETA === *@
+            @if (selectedMethod == 4)
+            {
+                <div class="detail-section">
+                    <h3>Datos de Tarjeta</h3>
+                    <div class="card-form">
+                        <div class="card-brands">
+                            <span class="brand-badge visa">VISA</span>
+                            <span class="brand-badge mc">MC</span>
+                            <span class="brand-badge disc">DISC</span>
+                        </div>
+                        <div class="form-field">
+                            <label>Numero de tarjeta</label>
+                            <input class="form-control"
+                                   @bind="cardNumber"
+                                   placeholder="1234 5678 9012 3456"
+                                   maxlength="19"
+                                   @oninput="FormatCardNumber" />
+                        </div>
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label>Fecha de caducidad</label>
+                                <input class="form-control"
+                                       @bind="cardExpiry"
+                                       placeholder="MM/AA"
+                                       maxlength="5"
+                                       @oninput="FormatExpiry" />
+                            </div>
+                            <div class="form-field">
+                                <label>Codigo de seguridad</label>
+                                <input class="form-control"
+                                       @bind="cardCvv"
+                                       placeholder="123"
+                                       maxlength="4"
+                                       type="password" />
+                            </div>
+                        </div>
+                        <div class="form-field">
+                            <label>Nombre en la tarjeta</label>
+                            <input class="form-control"
+                                   @bind="cardName"
+                                   placeholder="Nombre como aparece en la tarjeta" />
+                        </div>
+                        <div class="card-total">
+                            <span>Monto a cobrar:</span>
+                            <strong>Bs @orderTotal.ToString("N2")</strong>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* === QR === *@
+            @if (selectedMethod == 1)
+            {
+                <div class="detail-section">
+                    <h3>Escanea el codigo QR</h3>
+                    <div class="qr-content">
+                        <div class="qr-info">
+                            <div class="bank-row"><span>Banco:</span><strong>Banco Union</strong></div>
+                            <div class="bank-row"><span>Cuenta:</span><strong>123456789</strong></div>
+                            <div class="bank-row"><span>Titular:</span><strong>NovaTec S.R.L.</strong></div>
+                            <div class="bank-row"><span>Monto:</span><strong class="amount">Bs @orderTotal.ToString("N2")</strong></div>
+                            <div class="bank-row"><span>Referencia:</span><strong>PED-@OrderId</strong></div>
+                        </div>
+                        <div class="qr-code-box">
+                            <div id="qr-container"></div>
+                            <small>Escanea con tu app bancaria</small>
+                        </div>
+                    </div>
+                    <div class="upload-section">
+                        <label class="upload-label">
+                            Subir comprobante de pago
+                            <InputFile OnChange="HandleFileUpload" accept="image/*" class="file-input" />
+                        </label>
+                        @if (!string.IsNullOrEmpty(proofImagePreview))
+                        {
+                            <div class="proof-ok">Archivo cargado: @proofImagePreview</div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* === TRANSFERENCIA === *@
+            @if (selectedMethod == 2)
+            {
+                <div class="detail-section">
+                    <h3>Datos para Transferencia</h3>
+                    <div class="bank-details">
+                        <div class="bank-row"><span>Banco:</span><strong>Banco Union</strong></div>
+                        <div class="bank-row"><span>Tipo de Cuenta:</span><strong>Cuenta de Ahorro</strong></div>
+                        <div class="bank-row"><span>Nro. Cuenta:</span><strong>123-456-789</strong></div>
+                        <div class="bank-row"><span>Titular:</span><strong>NovaTec S.R.L.</strong></div>
+                        <div class="bank-row"><span>NIT:</span><strong>12345678</strong></div>
+                        <div class="bank-row amount-row"><span>Monto a depositar:</span><strong class="amount">Bs @orderTotal.ToString("N2")</strong></div>
+                        <div class="bank-row"><span>Referencia:</span><strong>PED-@OrderId</strong></div>
+                    </div>
+                    <div class="transfer-note">
+                        <strong>Importante:</strong> En el concepto indique "PED-@OrderId" para identificar su pago.
+                    </div>
+                </div>
+            }
+
+            @if (selectedMethod > 0)
+            {
+                <div class="payment-actions">
+                    <button class="btn-primary btn-lg"
+                            @onclick="ProcessPayment"
+                            disabled="@(processing || !CanProcess())">
+                        @(processing ? "Procesando..." : GetButtonText())
+                    </button>
+                    <button class="btn-secondary" @onclick="GoBack">Cancelar</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int OrderId { get; set; }
+
+    private int selectedMethod;
+    private bool processing;
+    private bool paymentCreated;
+    private bool loading = true;
+    private string? errorMessage;
+    private decimal orderTotal;
+    private string? proofImageBase64;
+    private string? proofImagePreview;
+    private string transactionCode = string.Empty;
+
+    private string cardNumber = "";
+    private string cardExpiry = "";
+    private string cardCvv = "";
+    private string cardName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrderTotal();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && selectedMethod == 1 && orderTotal > 0)
+        {
+            await GenerateQR();
+        }
+    }
+
+    private async Task LoadOrderTotal()
+    {
+        try
+        {
+            loading = true;
+            var order = await OrderService.GetByIdAsync(OrderId);
+            if (order != null) orderTotal = order.Total;
+        }
+        catch { orderTotal = 0; }
+        finally { loading = false; }
+    }
+
+    private async Task SelectMethod(int method)
+    {
+        selectedMethod = method;
+        StateHasChanged();
+        if (method == 1)
+        {
+            await Task.Delay(100);
+            await GenerateQR();
+        }
+    }
+
+    private async Task GenerateQR()
+    {
+        var qrText = $"BANCO_UNION|CUENTA_123456789|TITULAR_NovaTec|MONTO_{orderTotal:F2}|REF_PED-{OrderId}";
+        await JS.InvokeVoidAsync("qrInterop.generateQR", "qr-container", qrText, 180);
+    }
+
+    private void FormatCardNumber(ChangeEventArgs e)
+    {
+        var digits = new string(e.Value?.ToString()?.Where(char.IsDigit).ToArray() ?? []);
+        var formatted = string.Join(" ", Enumerable.Range(0, (digits.Length + 3) / 4)
+            .Select(i => digits.Skip(i * 4).Take(4).ToArray())
+            .Where(g => g.Length > 0)
+            .Select(g => new string(g)));
+        cardNumber = formatted;
+    }
+
+    private void FormatExpiry(ChangeEventArgs e)
+    {
+        var digits = new string(e.Value?.ToString()?.Where(char.IsDigit).ToArray() ?? []);
+        if (digits.Length >= 2)
+            cardExpiry = $"{digits[..2]}/{digits[2..]}";
+        else
+            cardExpiry = digits;
+    }
+
+    private bool CanProcess()
+    {
+        if (selectedMethod == 4)
+        {
+            var digits = new string(cardNumber.Where(char.IsDigit).ToArray());
+            return digits.Length >= 13 && cardExpiry.Length == 5 && cardCvv.Length >= 3 && !string.IsNullOrWhiteSpace(cardName);
+        }
+        if (selectedMethod == 1)
+            return !string.IsNullOrEmpty(proofImageBase64);
+        return true;
+    }
+
+    private string GetButtonText() => selectedMethod switch
+    {
+        3 => "Confirmar pago en efectivo",
+        4 => "Pagar con tarjeta",
+        1 => "Enviar comprobante",
+        2 => "Confirmar pago",
+        _ => "Confirmar"
+    };
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+        using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        proofImageBase64 = Convert.ToBase64String(ms.ToArray());
+        proofImagePreview = file.Name;
+    }
+
+    private async Task ProcessPayment()
+    {
+        processing = true;
+        errorMessage = null;
+
+        try
+        {
+            var request = new CreatePaymentRequest
+            {
+                OrderId = OrderId,
+                Method = selectedMethod,
+                Amount = orderTotal,
+                ProofImage = selectedMethod == 1 ? proofImageBase64 : null
+            };
+
+            var result = await PaymentService.CreateAsync(request);
+
+            if (result != null)
+            {
+                paymentCreated = true;
+                transactionCode = result.TransactionCode ?? $"TXN-{DateTime.UtcNow:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+            }
+            else
+            {
+                errorMessage = "No se pudo registrar el pago. Es posible que ya exista un pago para este pedido.";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al procesar el pago.";
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/carrito");
+    private void GoToOrder() => Navigation.NavigateTo($"/mis-pedidos/{OrderId}");
+}

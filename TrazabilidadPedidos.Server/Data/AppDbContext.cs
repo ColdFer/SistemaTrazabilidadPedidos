@@ -24,6 +24,12 @@ namespace TrazabilidadPedidos.Server.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Permission> Permissions => Set<Permission>();
         public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+        public DbSet<Cart> Carts => Set<Cart>();
+        public DbSet<CartItem> CartItems => Set<CartItem>();
+        public DbSet<Notification> Notifications => Set<Notification>();
+        public DbSet<Invoice> Invoices => Set<Invoice>();
+        public DbSet<InvoiceDetail> InvoiceDetails => Set<InvoiceDetail>();
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -570,6 +576,29 @@ namespace TrazabilidadPedidos.Server.Data
                     .HasForeignKey(e => e.ProductId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+            modelBuilder.Entity<Cart>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.Customer)
+                    .WithMany()
+                    .HasForeignKey(e => e.CustomerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<CartItem>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.Cart)
+                    .WithMany(c => c.Items)
+                    .HasForeignKey(e => e.CartId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Product)
+                    .WithMany()
+                    .HasForeignKey(e => e.ProductId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
             modelBuilder.Entity<User>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -600,6 +629,71 @@ namespace TrazabilidadPedidos.Server.Data
                     .HasForeignKey(e => e.RoleId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+
+            modelBuilder.Entity<Notification>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Message).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.Type).HasMaxLength(50);
+                entity.HasIndex(e => e.IsRead);
+                entity.HasIndex(e => e.UserId);
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Invoice>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Code).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Nit).IsRequired().HasMaxLength(20);
+                entity.Property(e => e.RazonSocial).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Direccion).HasMaxLength(300);
+                entity.Property(e => e.Subtotal).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.IvaRate).HasColumnType("decimal(5,2)");
+                entity.Property(e => e.IvaAmount).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Total).HasColumnType("decimal(18,2)");
+                entity.HasIndex(e => e.Code).IsUnique();
+                entity.HasOne(e => e.Order)
+                    .WithMany()
+                    .HasForeignKey(e => e.OrderId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.Customer)
+                    .WithMany()
+                    .HasForeignKey(e => e.CustomerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<InvoiceDetail>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ProductName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.ProductCode).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.UnitPrice).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Subtotal).HasColumnType("decimal(18,2)");
+                entity.HasOne(e => e.Invoice)
+                    .WithMany(i => i.Details)
+                    .HasForeignKey(e => e.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.Product)
+                    .WithMany()
+                    .HasForeignKey(e => e.ProductId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            modelBuilder.Entity<OrderStatus>().HasData(
+                new OrderStatus { Id = 1, Name = "Pendiente", Description = "Pedido registrado, esperando preparación", SortOrder = 1, IsActive = true, CreatedAt = seedDate, UpdatedAt = seedDate },
+                new OrderStatus { Id = 2, Name = "Aceptado", Description = "Pedido aceptado por el operador", SortOrder = 2, IsActive = true, CreatedAt = seedDate, UpdatedAt = seedDate },
+                new OrderStatus { Id = 3, Name = "Preparando", Description = "Pedido en preparación", SortOrder = 3, IsActive = true, CreatedAt = seedDate, UpdatedAt = seedDate },
+                new OrderStatus { Id = 4, Name = "ListoParaEntrega", Description = "Pedido listo para entrega", SortOrder = 4, IsActive = true, CreatedAt = seedDate, UpdatedAt = seedDate },
+                new OrderStatus { Id = 5, Name = "EnCamino", Description = "Pedido en ruta de entrega", SortOrder = 5, IsActive = true, CreatedAt = seedDate, UpdatedAt = seedDate },
+                new OrderStatus { Id = 6, Name = "Entregado", Description = "Pedido entregado al cliente", SortOrder = 6, IsActive = true, CreatedAt = seedDate, UpdatedAt = seedDate },
+                new OrderStatus { Id = 7, Name = "Cancelado", Description = "Pedido cancelado", SortOrder = 7, IsActive = true, CreatedAt = seedDate, UpdatedAt = seedDate }
+            );
         }
     }
 }

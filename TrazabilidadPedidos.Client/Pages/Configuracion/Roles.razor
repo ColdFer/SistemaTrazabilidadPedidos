@@ -1,0 +1,383 @@
+@page "/configuracion/roles"
+@using TrazabilidadPedidos.Client.Services
+@inject RoleClientService RoleService
+@inject PermissionClientService PermissionService
+@inject NavigationManager Navigation
+
+<PageTitle>Roles y Permisos</PageTitle>
+
+<div class="config-page">
+    <div class="page-header">
+        <div>
+            <h1>Roles y Permisos</h1>
+            <p>Administra los roles del sistema y sus permisos asignados.</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-secondary" @onclick="ShowPermissionsPanel">
+                Gestionar Permisos
+            </button>
+            <button class="btn-primary" @onclick="ShowCreateForm">
+                + Nuevo Rol
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert-success">@successMessage</div>
+    }
+
+    @if (showPermissionsPanel)
+    {
+        <div class="permissions-panel">
+            <div class="panel-header">
+                <h3>Gestionar Permisos</h3>
+                <button class="btn-close" @onclick="() => showPermissionsPanel = false">X</button>
+            </div>
+
+            @if (editingPermission != null)
+            {
+                <div class="inline-form">
+                    <input @bind="editingPermission.Name" placeholder="Nombre del permiso" class="form-control" />
+                    <input @bind="editingPermission.Description" placeholder="Descripcion" class="form-control" />
+                    <button class="btn-primary btn-sm" @onclick="SavePermission" disabled="@saving">
+                        @(saving ? "Guardando..." : "Guardar")
+                    </button>
+                    <button class="btn-secondary btn-sm" @onclick="CancelEditPermission">Cancelar</button>
+                </div>
+            }
+            else
+            {
+                <div class="inline-form">
+                    <input @bind="newPermissionName" placeholder="Nuevo permiso (nombre)" class="form-control" />
+                    <input @bind="newPermissionDesc" placeholder="Descripcion" class="form-control" />
+                    <button class="btn-primary btn-sm" @onclick="CreatePermission" disabled="@(saving || string.IsNullOrWhiteSpace(newPermissionName))">
+                        Agregar
+                    </button>
+                </div>
+            }
+
+            <div class="permissions-list">
+                @foreach (var perm in allPermissions)
+                {
+                    <div class="permission-item">
+                        <div class="perm-info">
+                            <strong>@perm.Name</strong>
+                            <span>@perm.Description</span>
+                        </div>
+                        <div class="perm-actions">
+                            <button class="btn-icon" @onclick="() => EditPermission(perm)">Editar</button>
+                            <button class="btn-icon btn-danger" @onclick="() => DeletePermission(perm.Id)">Eliminar</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (showRoleForm)
+    {
+        <div class="modal-overlay" @onclick="() => showRoleForm = false">
+            <div class="modal-card" @onclick:stopPropagation>
+                <h3>@(editingRole != null ? "Editar Rol" : "Nuevo Rol")</h3>
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input @bind="roleFormName" class="form-control" placeholder="Nombre del rol" />
+                </div>
+                <div class="form-group">
+                    <label>Descripcion</label>
+                    <input @bind="roleFormDesc" class="form-control" placeholder="Descripcion opcional" />
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" @onclick="() => showRoleForm = false">Cancelar</button>
+                    <button class="btn-primary" @onclick="SaveRole" disabled="@(saving || string.IsNullOrWhiteSpace(roleFormName))">
+                        @(saving ? "Guardando..." : "Guardar")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showPermissionsAssign)
+    {
+        <div class="modal-overlay" @onclick="() => showPermissionsAssign = false">
+            <div class="modal-card modal-lg" @onclick:stopPropagation>
+                <h3>Permisos de: @assigningRole?.Name</h3>
+                <p class="modal-hint">Selecciona los permisos que tendra este rol.</p>
+                <div class="permission-checkboxes">
+                    @foreach (var perm in allPermissions)
+                    {
+                        <label class="checkbox-item">
+                            <input type="checkbox"
+                                   checked="@(selectedPermissionIds.Contains(perm.Id))"
+                                   @onchange="() => TogglePermission(perm.Id)" />
+                            <span class="perm-name">@perm.Name</span>
+                            <span class="perm-desc">@perm.Description</span>
+                        </label>
+                    }
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" @onclick="() => showPermissionsAssign = false">Cancelar</button>
+                    <button class="btn-primary" @onclick="SavePermissions" disabled="@saving">
+                        @(saving ? "Guardando..." : "Guardar Permisos")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando roles...</div>
+    }
+    else
+    {
+        <div class="roles-grid">
+            @foreach (var role in roles)
+            {
+                <div class="role-card">
+                    <div class="role-header">
+                        <div class="role-icon">@role.Name[..1]</div>
+                        <div>
+                            <strong>@role.Name</strong>
+                            <span class="role-users">@role.UserCount usuario(s)</span>
+                        </div>
+                        <span class="role-badge @(role.IsActive ? "active" : "inactive")">
+                            @(role.IsActive ? "Activo" : "Inactivo")
+                        </span>
+                    </div>
+                    <p class="role-desc">@role.Description</p>
+                    <div class="role-permissions-summary">
+                        <span>@role.PermCount permiso(s) asignados</span>
+                    </div>
+                    <div class="role-actions">
+                        <button class="btn-icon" @onclick="() => AssignPermissions(role)">Permisos</button>
+                        <button class="btn-icon" @onclick="() => EditRole(role)">Editar</button>
+                        <button class="btn-icon btn-danger" @onclick="() => DeleteRole(role.Id, role.Name)"
+                                disabled="@(role.UserCount > 0 || IsProtectedRole(role.Name))">
+                            Eliminar
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<RoleDto> roles = new();
+    private List<PermissionDto> allPermissions = new();
+    private bool loading = true;
+    private bool saving;
+    private string? errorMessage;
+    private string? successMessage;
+
+    private bool showRoleForm;
+    private bool showPermissionsPanel;
+    private bool showPermissionsAssign;
+    private RoleDto? editingRole;
+    private string roleFormName = "";
+    private string roleFormDesc = "";
+
+    private RoleDto? assigningRole;
+    private List<int> selectedPermissionIds = new();
+
+    private PermissionDto? editingPermission;
+    private string newPermissionName = "";
+    private string newPermissionDesc = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            loading = true;
+            roles = await RoleService.GetAllAsync();
+            allPermissions = await PermissionService.GetAllAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al cargar datos.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        editingRole = null;
+        roleFormName = "";
+        roleFormDesc = "";
+        showRoleForm = true;
+    }
+
+    private void EditRole(RoleDto role)
+    {
+        editingRole = role;
+        roleFormName = role.Name;
+        roleFormDesc = role.Description ?? "";
+        showRoleForm = true;
+    }
+
+    private async Task SaveRole()
+    {
+        saving = true;
+        errorMessage = null;
+        try
+        {
+            if (editingRole != null)
+            {
+                var ok = await RoleService.UpdateAsync(editingRole.Id, new UpdateRoleRequest
+                {
+                    Name = roleFormName,
+                    Description = roleFormDesc,
+                    IsActive = editingRole.IsActive
+                });
+                if (!ok) { errorMessage = "No se pudo actualizar el rol."; return; }
+            }
+            else
+            {
+                var result = await RoleService.CreateAsync(new CreateRoleRequest
+                {
+                    Name = roleFormName,
+                    Description = roleFormDesc
+                });
+                if (result == null) { errorMessage = "No se pudo crear el rol."; return; }
+            }
+            showRoleForm = false;
+            successMessage = editingRole != null ? "Rol actualizado." : "Rol creado.";
+            await LoadData();
+        }
+        catch { errorMessage = "Error al guardar el rol."; }
+        finally { saving = false; }
+    }
+
+    private async Task DeleteRole(int id, string name)
+    {
+        if (!await Confirmar($"Eliminar el rol '{name}'?")) return;
+        try
+        {
+            var ok = await RoleService.DeleteAsync(id);
+            if (ok) { successMessage = "Rol eliminado."; await LoadData(); }
+            else { errorMessage = "No se pudo eliminar el rol."; }
+        }
+        catch { errorMessage = "Error al eliminar."; }
+    }
+
+    private void AssignPermissions(RoleDto role)
+    {
+        assigningRole = role;
+        selectedPermissionIds = role.PermCount > 0
+            ? role.Permissions.Select(p => p.Id).ToList()
+            : new();
+        showPermissionsAssign = true;
+    }
+
+    private void TogglePermission(int permId)
+    {
+        if (selectedPermissionIds.Contains(permId))
+            selectedPermissionIds.Remove(permId);
+        else
+            selectedPermissionIds.Add(permId);
+    }
+
+    private async Task SavePermissions()
+    {
+        if (assigningRole == null) return;
+        saving = true;
+        try
+        {
+            var ok = await RoleService.UpdatePermissionsAsync(assigningRole.Id, selectedPermissionIds);
+            if (ok) { successMessage = "Permisos actualizados."; showPermissionsAssign = false; await LoadData(); }
+            else { errorMessage = "No se pudieron guardar los permisos."; }
+        }
+        catch { errorMessage = "Error al guardar permisos."; }
+        finally { saving = false; }
+    }
+
+    private void ShowPermissionsPanel()
+    {
+        showPermissionsPanel = true;
+        editingPermission = null;
+        newPermissionName = "";
+        newPermissionDesc = "";
+    }
+
+    private void EditPermission(PermissionDto perm)
+    {
+        editingPermission = perm;
+        newPermissionName = perm.Name;
+        newPermissionDesc = perm.Description ?? "";
+    }
+
+    private void CancelEditPermission()
+    {
+        editingPermission = null;
+        newPermissionName = "";
+        newPermissionDesc = "";
+    }
+
+    private async Task CreatePermission()
+    {
+        if (string.IsNullOrWhiteSpace(newPermissionName)) return;
+        saving = true;
+        try
+        {
+            var result = await PermissionService.CreateAsync(newPermissionName, newPermissionDesc);
+            if (result != null) { successMessage = "Permiso creado."; newPermissionName = ""; newPermissionDesc = ""; await LoadData(); }
+            else { errorMessage = "No se pudo crear el permiso."; }
+        }
+        catch { errorMessage = "Error al crear permiso."; }
+        finally { saving = false; }
+    }
+
+    private async Task SavePermission()
+    {
+        if (editingPermission == null || string.IsNullOrWhiteSpace(newPermissionName)) return;
+        saving = true;
+        try
+        {
+            var ok = await PermissionService.UpdateAsync(editingPermission.Id, newPermissionName, newPermissionDesc);
+            if (ok) { successMessage = "Permiso actualizado."; CancelEditPermission(); await LoadData(); }
+            else { errorMessage = "No se pudo actualizar."; }
+        }
+        catch { errorMessage = "Error al guardar."; }
+        finally { saving = false; }
+    }
+
+    private async Task DeletePermission(int id)
+    {
+        if (!await Confirmar("Eliminar este permiso?")) return;
+        try
+        {
+            var ok = await PermissionService.DeleteAsync(id);
+            if (ok) { successMessage = "Permiso eliminado."; await LoadData(); }
+            else { errorMessage = "No se pudo eliminar. Puede estar asignado a un rol."; }
+        }
+        catch { errorMessage = "Error al eliminar."; }
+    }
+
+    private ValueTask<bool> Confirmar(string message)
+    {
+        return _js.InvokeAsync<bool>("confirm", message);
+    }
+
+    private static bool IsProtectedRole(string name) => name == "Administrator" || name == "Customer";
+
+    [Inject] private IJSRuntime _js { get; set; } = default!;
+}

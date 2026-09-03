@@ -1,0 +1,39 @@
+﻿@page "/repartidor/inicio"
+
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+<PageTitle>Mis Despachos</PageTitle>
+
+<div>
+
+    <h1>Portal del Repartidor</h1>
+
+    <p>
+        Bienvenido, <strong>@userName</strong>.
+    </p>
+
+    <div class="alert alert-info mt-4">
+        Aquí se mostrarán únicamente los despachos
+        asignados al repartidor autenticado.
+    </div>
+
+</div>
+
+@code {
+    private string userName = "Repartidor";
+
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
+    {
+        if (firstRender)
+        {
+            userName =
+                await JS.InvokeAsync<string>(
+                    "localStorage.getItem",
+                    "userName")
+                ?? "Repartidor";
+
+            StateHasChanged();
+        }
+    }
+}

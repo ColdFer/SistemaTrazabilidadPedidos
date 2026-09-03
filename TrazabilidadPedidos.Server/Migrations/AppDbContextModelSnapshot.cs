@@ -48,6 +48,12 @@ namespace TrazabilidadPedidos.Server.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("float");
+
                     b.Property<string>("Reference")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
@@ -60,6 +66,103 @@ namespace TrazabilidadPedidos.Server.Migrations
                     b.HasIndex("CustomerId");
 
                     b.ToTable("Addresses");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.AuditLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Entity")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("EntityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AuditLogs");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Cart", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("Carts");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.CartItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CartId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CartId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("CartItems");
                 });
 
             modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Category", b =>
@@ -142,7 +245,7 @@ namespace TrazabilidadPedidos.Server.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AddressId")
+                    b.Property<int?>("AddressId")
                         .HasColumnType("int");
 
                     b.Property<string>("ContactPhone")
@@ -309,6 +412,154 @@ namespace TrazabilidadPedidos.Server.Migrations
                     b.ToTable("InventoryMovements");
                 });
 
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Invoice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Direccion")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime>("InvoiceDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("IvaAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("IvaRate")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("Nit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RazonSocial")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("Invoices");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.InvoiceDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("InvoiceDetails");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("RelatedId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Type")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsRead");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Order", b =>
                 {
                     b.Property<int>("Id")
@@ -330,6 +581,18 @@ namespace TrazabilidadPedidos.Server.Migrations
 
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
+
+                    b.Property<string>("DeliveryAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double?>("DeliveryLatitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("DeliveryLongitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("DeliveryReference")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Observation")
                         .HasColumnType("nvarchar(max)");
@@ -419,6 +682,78 @@ namespace TrazabilidadPedidos.Server.Migrations
                         .IsUnique();
 
                     b.ToTable("OrderStatuses");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pedido registrado, esperando preparación",
+                            IsActive = true,
+                            Name = "Pendiente",
+                            SortOrder = 1,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pedido aceptado por el operador",
+                            IsActive = true,
+                            Name = "Aceptado",
+                            SortOrder = 2,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pedido en preparación",
+                            IsActive = true,
+                            Name = "Preparando",
+                            SortOrder = 3,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pedido listo para entrega",
+                            IsActive = true,
+                            Name = "ListoParaEntrega",
+                            SortOrder = 4,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pedido en ruta de entrega",
+                            IsActive = true,
+                            Name = "EnCamino",
+                            SortOrder = 5,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pedido entregado al cliente",
+                            IsActive = true,
+                            Name = "Entregado",
+                            SortOrder = 6,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pedido cancelado",
+                            IsActive = true,
+                            Name = "Cancelado",
+                            SortOrder = 7,
+                            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
                 });
 
             modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.OrderStatusHistory", b =>
@@ -485,6 +820,9 @@ namespace TrazabilidadPedidos.Server.Migrations
                     b.Property<DateTime>("PaymentDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("ProofImage")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Receipt")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
@@ -493,6 +831,9 @@ namespace TrazabilidadPedidos.Server.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("TransactionCode")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -959,6 +1300,45 @@ namespace TrazabilidadPedidos.Server.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.AuditLog", b =>
+                {
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Cart", b =>
+                {
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.CartItem", b =>
+                {
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.Cart", "Cart")
+                        .WithMany("Items")
+                        .HasForeignKey("CartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cart");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Customer", b =>
                 {
                     b.HasOne("TrazabilidadPedidos.Shared.Entities.User", "User")
@@ -975,8 +1355,7 @@ namespace TrazabilidadPedidos.Server.Migrations
                     b.HasOne("TrazabilidadPedidos.Shared.Entities.Address", "Address")
                         .WithMany()
                         .HasForeignKey("AddressId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TrazabilidadPedidos.Shared.Entities.DeliveryDriver", "DeliveryDriver")
                         .WithMany()
@@ -1041,6 +1420,55 @@ namespace TrazabilidadPedidos.Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Invoice", b =>
+                {
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.InvoiceDetail", b =>
+                {
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.Invoice", "Invoice")
+                        .WithMany("Details")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Notification", b =>
+                {
+                    b.HasOne("TrazabilidadPedidos.Shared.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -1169,6 +1597,11 @@ namespace TrazabilidadPedidos.Server.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Cart", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Category", b =>
                 {
                     b.Navigation("Products");
@@ -1177,6 +1610,11 @@ namespace TrazabilidadPedidos.Server.Migrations
             modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Delivery", b =>
                 {
                     b.Navigation("Incidents");
+                });
+
+            modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Invoice", b =>
+                {
+                    b.Navigation("Details");
                 });
 
             modelBuilder.Entity("TrazabilidadPedidos.Shared.Entities.Order", b =>

@@ -1,0 +1,117 @@
+@page "/pagos/pendientes"
+@inject PaymentClientService PaymentService
+@inject NavigationManager Navigation
+
+<PageTitle>Pagos Pendientes</PageTitle>
+
+<div class="payments-page">
+    <div class="page-header">
+        <h1>Pagos Pendientes de Verificación</h1>
+        <p>Aprobar o rechazar comprobantes de pago QR.</p>
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando pagos...</div>
+    }
+    else if (!payments.Any())
+    {
+        <div class="empty-state">
+            <p>No hay pagos pendientes de verificación.</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var payment in payments)
+        {
+            <div class="payment-card">
+                <div class="payment-header">
+                    <span class="badge badge-pending">Pendiente</span>
+                    <span class="payment-date">@payment.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+                <div class="payment-body">
+                    <div class="payment-info">
+                        <strong>Pedido: @payment.OrderCode</strong>
+                        <span>Monto: <b>Bs @payment.Amount.ToString("N2")</b></span>
+                        <span>Método: @payment.Method</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(payment.ProofImage))
+                    {
+                        <div class="proof-section">
+                            <img src="data:image;base64,@payment.ProofImage" alt="Comprobante" class="proof-image" />
+                        </div>
+                    }
+                </div>
+                <div class="payment-actions">
+                    <button class="btn-approve" @onclick="() => ApprovePayment(payment.Id)">
+                        Aprobar
+                    </button>
+                    <button class="btn-reject" @onclick="() => RejectPayment(payment.Id)">
+                        Rechazar
+                    </button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<PaymentDto> payments = new();
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPayments();
+    }
+
+    private async Task LoadPayments()
+    {
+        try
+        {
+            loading = true;
+            payments = await PaymentService.GetPendingAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            payments = new();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ApprovePayment(int paymentId)
+    {
+        try
+        {
+            var result = await PaymentService.VerifyAsync(paymentId,
+                new VerifyPaymentRequest { Status = 2, Observation = "Aprobado" });
+            if (result != null)
+                payments = payments.Where(p => p.Id != paymentId).ToList();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error approving payment: {ex.Message}");
+        }
+    }
+
+    private async Task RejectPayment(int paymentId)
+    {
+        try
+        {
+            var result = await PaymentService.VerifyAsync(paymentId,
+                new VerifyPaymentRequest { Status = 3, Observation = "Rechazado por el operador" });
+            if (result != null)
+                payments = payments.Where(p => p.Id != paymentId).ToList();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error rejecting payment: {ex.Message}");
+        }
+    }
+}

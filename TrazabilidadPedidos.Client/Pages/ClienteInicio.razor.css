@@ -1,0 +1,99 @@
+﻿.customer-page {
+    width: 100%;
+}
+
+.welcome-card {
+    min-height: 175px;
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    border-radius: 16px;
+    background: linear-gradient( 120deg, #123762 0%, #2868af 100% );
+    color: white;
+    box-shadow: 0 10px 25px rgba(28, 65, 110, .15);
+    margin-bottom: 28px;
+}
+
+    .welcome-card span {
+        color: #bfd7f4;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+    }
+
+    .welcome-card h1 {
+        margin: 6px 0 9px;
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    .welcome-card p {
+        margin: 0;
+        color: #dce9f7;
+        font-size: 14px;
+    }
+
+.customer-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.option-card {
+    background: white;
+    border: 1px solid #e1e7ee;
+    border-radius: 14px;
+    padding: 22px;
+    display: flex;
+    gap: 16px;
+    box-shadow: 0 6px 18px rgba(25, 48, 76, .05);
+    text-decoration: none;
+    color: inherit;
+    transition: transform .2s, box-shadow .2s;
+    cursor: pointer;
+}
+
+.option-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(25, 48, 76, .10);
+}
+
+.option-icon {
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: #e8f1ff;
+    color: #3478d4;
+    font-weight: 800;
+    font-size: 18px;
+}
+
+.option-card span {
+    color: #8995a5;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.option-card h3 {
+    margin: 3px 0 7px;
+    color: #263c57;
+    font-size: 18px;
+}
+
+.option-card p {
+    margin: 0;
+    color: #7c8795;
+    line-height: 1.5;
+    font-size: 13px;
+}
+
+@media (max-width: 900px) {
+    .customer-options {
+        grid-template-columns: 1fr;
+    }
+}

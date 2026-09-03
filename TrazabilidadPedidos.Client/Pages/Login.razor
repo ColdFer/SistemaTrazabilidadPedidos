@@ -1,0 +1,172 @@
+﻿@page "/login"
+@layout TrazabilidadPedidos.Client.Layout.AuthLayout
+
+@using TrazabilidadPedidos.Shared.DTOs
+@using TrazabilidadPedidos.Client.Services
+
+@inject AuthClientService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Iniciar Sesión</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-5 col-lg-4">
+
+            <div class="card shadow">
+                <div class="card-body p-4">
+
+                    <h2 class="text-center mb-2">
+                        NovaTec
+                    </h2>
+
+                    <p class="text-center text-muted mb-4">
+                        Iniciar sesión
+                    </p>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @errorMessage
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success">
+                            @successMessage
+                        </div>
+                    }
+
+                    <EditForm Model="@loginRequest"
+                              OnValidSubmit="HandleLogin">
+
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Correo electrónico
+                            </label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="loginRequest.Email" />
+
+                            <ValidationMessage For="@(() => loginRequest.Email)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Contraseña
+                            </label>
+
+                            <InputText class="form-control"
+                                       type="password"
+                                       @bind-Value="loginRequest.Password" />
+
+                            <ValidationMessage For="@(() => loginRequest.Password)" />
+                        </div>
+
+                        <button type="submit"
+                                class="btn btn-primary w-100"
+                                disabled="@isLoading">
+
+                            @if (isLoading)
+                            {
+                                <span>Ingresando...</span>
+                            }
+                            else
+                            {
+                                <span>Iniciar sesión</span>
+                            }
+
+                        </button>
+
+                    </EditForm>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+
+    private LoginRequest loginRequest = new();
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    private bool isLoading;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        successMessage = null;
+        isLoading = true;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(loginRequest);
+
+            if (result is null)
+            {
+                errorMessage = "Correo electrónico o contraseña incorrectos.";
+                return;
+            }
+
+            await JS.InvokeVoidAsync(
+                "localStorage.setItem",
+                "authToken",
+                result.Token);
+
+            await JS.InvokeVoidAsync(
+                "localStorage.setItem",
+                "userName",
+                result.FullName);
+
+            await JS.InvokeVoidAsync(
+                "localStorage.setItem",
+                "userRole",
+                result.Role);
+
+            await JS.InvokeVoidAsync(
+                "localStorage.setItem",
+                "userId",
+                result.UserId.ToString());
+
+            switch (result.Role)
+            {
+                case "Administrator":
+                case "Operator":
+                    Navigation.NavigateTo("/dashboard");
+                    break;
+
+                case "Customer":
+                    Navigation.NavigateTo("/cliente/inicio");
+                    break;
+
+                case "DeliveryDriver":
+                    Navigation.NavigateTo("/repartidor/inicio");
+                    break;
+
+                default:
+                    Navigation.NavigateTo("/login");
+                    break;
+            }
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception)
+        {
+            errorMessage = "No se pudo establecer conexión con el servidor.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

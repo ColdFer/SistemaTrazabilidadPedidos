@@ -1,0 +1,157 @@
+@page "/carrito/confirmar"
+@inject CartClientService CartService
+@inject OrderClientService OrderService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Confirmar Pedido</PageTitle>
+
+<div class="confirm-page">
+    <div class="page-header">
+        <div>
+            <h1>Confirmar Pedido</h1>
+            <p>Selecciona la ubicacion de entrega y confirma tu pedido.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando resumen del pedido...</div>
+    }
+    else if (cart == null || !cart.Items.Any())
+    {
+        <div class="empty-cart">
+            <strong>Tu carrito esta vacio</strong>
+            <button class="btn-primary" @onclick="IrCatalogo">Ver catalogo</button>
+        </div>
+    }
+    else
+    {
+        <div class="confirm-grid">
+            <div class="confirm-left">
+                <div class="section-card">
+                    <h3>Ubicacion de Entrega</h3>
+                    <p class="section-hint">Haz clic en el mapa para seleccionar tu punto de entrega.</p>
+                    <LocationPicker OnLocationChanged="OnLocationChanged" />
+                </div>
+            </div>
+
+            <div class="confirm-right">
+                <div class="section-card summary-card">
+                    <h3>Resumen del Pedido</h3>
+                    <div class="cart-items-summary">
+                        @foreach (var item in cart.Items)
+                        {
+                            <div class="summary-item">
+                                <span class="item-name">@item.ProductName</span>
+                                <span class="item-qty">x@(item.Quantity)</span>
+                                <span class="item-price">Bs @item.Subtotal.ToString("N2")</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="summary-total">
+                        <span>Total</span>
+                        <span class="total-amount">Bs @cart.Total.ToString("N2")</span>
+                    </div>
+                    <div class="confirm-actions">
+                        <button class="btn-secondary" @onclick="VolverCarrito">Volver al carrito</button>
+                        <button class="btn-primary btn-confirm"
+                                @onclick="ConfirmOrder"
+                                disabled="@processing">
+                            @(processing ? "Procesando..." : "Confirmar Pedido")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private CartDto? cart;
+    private bool loading = true;
+    private bool processing;
+    private string? errorMessage;
+
+    private double deliveryLat = -17.7833;
+    private double deliveryLng = -63.1821;
+    private string? deliveryAddress;
+    private string? deliveryReference;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            loading = true;
+            cart = await CartService.GetCartAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudo cargar el carrito.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void OnLocationChanged(LocationPicker.LocationResult location)
+    {
+        deliveryLat = location.Latitude;
+        deliveryLng = location.Longitude;
+        deliveryAddress = location.Address;
+        deliveryReference = location.Reference;
+    }
+
+    private async Task ConfirmOrder()
+    {
+        processing = true;
+        errorMessage = null;
+
+        try
+        {
+            var request = new CreateFromCartRequest
+            {
+                DeliveryLatitude = deliveryLat,
+                DeliveryLongitude = deliveryLng,
+                DeliveryAddress = deliveryAddress,
+                DeliveryReference = deliveryReference
+            };
+
+            var result = await OrderService.CreateFromCartAsync(request);
+
+            if (result != null)
+            {
+                Navigation.NavigateTo($"/pagos/seleccionar/{result.Id}");
+            }
+            else
+            {
+                errorMessage = "No se pudo crear el pedido. Verifique el stock disponible.";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al procesar el pedido.";
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private void IrCatalogo() => Navigation.NavigateTo("/catalogo");
+    private void VolverCarrito() => Navigation.NavigateTo("/carrito");
+}

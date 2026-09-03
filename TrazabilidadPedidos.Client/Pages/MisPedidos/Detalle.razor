@@ -1,0 +1,191 @@
+@page "/mis-pedidos/{Id:int}"
+@inject OrderClientService OrderService
+@inject InvoiceClientService InvoiceService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Detalle del pedido</PageTitle>
+
+<div class="order-detail-page">
+
+    <button class="btn-back" @onclick="Volver">← @(isStaff ? "Volver a pedidos" : "Volver a mis pedidos")</button>
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando pedido...</div>
+    }
+    else if (order == null)
+    {
+        <div class="empty-box">
+            <strong>Pedido no encontrado.</strong>
+        </div>
+    }
+    else
+    {
+        <div class="order-header-card">
+            <div class="order-info">
+                <h2>Pedido #@order.Code</h2>
+                <p>Realizado el @order.OrderDate.ToString("dd/MM/yyyy 'a las' HH:mm")</p>
+            </div>
+
+            <div class="order-status-area">
+                <span class="@GetStatusClass(order.StatusName)">
+                    @order.StatusName
+                </span>
+            </div>
+        </div>
+
+        <div class="order-grid">
+            <div class="order-items-card">
+                <h3>Productos</h3>
+
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cant.</th>
+                            <th>Precio</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in order.Details)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="item-cell">
+                                        <strong>@item.ProductName</strong>
+                                        <span>@item.ProductCode</span>
+                                    </div>
+                                </td>
+                                <td>@item.Quantity</td>
+                                <td>Bs @item.UnitPrice.ToString("N2")</td>
+                                <td><strong>Bs @item.Subtotal.ToString("N2")</strong></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="order-total">
+                    <span>Total del pedido:</span>
+                    <strong>Bs @order.Total.ToString("N2")</strong>
+                </div>
+
+                @if (order.StatusName == "Entregado")
+                {
+                    <div class="invoice-section">
+                        <button class="btn-invoice" @onclick="DownloadInvoice">
+                            &#128196; Descargar Factura
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <div class="order-timeline-card">
+                <h3>Seguimiento</h3>
+
+                @if (history.Any())
+                {
+                    <div class="timeline">
+                        @foreach (var entry in history)
+                        {
+                            <div class="timeline-step completed">
+                                <div class="timeline-dot"></div>
+                                <div class="timeline-content">
+                                    <strong>@entry.StatusName</strong>
+                                    <span class="timeline-date">
+                                        @entry.StatusDate.ToString("dd/MM/yyyy HH:mm")
+                                        @if (!string.IsNullOrEmpty(entry.UserName))
+                                        {
+                                            <text> — @entry.UserName</text>
+                                        }
+                                    </span>
+                                    @if (!string.IsNullOrEmpty(entry.Observation))
+                                    {
+                                        <p class="timeline-observation">@entry.Observation</p>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">Sin historial disponible.</p>
+                }
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private OrderDto? order;
+    private List<OrderStatusHistoryDto> history = new();
+    private bool loading = true;
+    private bool isStaff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await JS.InvokeAsync<string>("localStorage.getItem", "userRole") ?? "";
+        isStaff = role == "Administrator" || role == "Operator" || role == "DeliveryDriver";
+        await LoadOrder();
+    }
+
+    private async Task LoadOrder()
+    {
+        try
+        {
+            loading = true;
+            order = await OrderService.GetByIdAsync(Id);
+            if (order != null)
+            {
+                history = await OrderService.GetHistoryAsync(Id);
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo(isStaff ? "/pedidos" : "/mis-pedidos");
+    }
+
+    private static string GetStatusClass(string status) => status switch
+    {
+        "Pendiente" => "status-badge pending",
+        "Aceptado" => "status-badge accepted",
+        "Preparando" => "status-badge preparing",
+        "ListoParaEntrega" => "status-badge ready",
+        "EnCamino" => "status-badge in-route",
+        "Entregado" => "status-badge delivered",
+        "Cancelado" => "status-badge cancelled",
+        _ => "status-badge"
+    };
+
+    private async Task DownloadInvoice()
+    {
+        try
+        {
+            var invoice = await InvoiceService.GenerateAsync(Id);
+            if (invoice != null)
+            {
+                Navigation.NavigateTo($"/facturas/{invoice.Id}");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error generating invoice: {ex.Message}");
+        }
+    }
+}

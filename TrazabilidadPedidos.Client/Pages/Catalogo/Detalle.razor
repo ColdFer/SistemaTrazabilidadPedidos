@@ -1,0 +1,196 @@
+@page "/catalogo/{Id:int}"
+@inject InventoryClientService InventoryService
+@inject CartClientService CartService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Detalle del producto</PageTitle>
+
+<div class="detail-page">
+
+    <button class="btn-back" @onclick="Volver">← Volver al catálogo</button>
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando producto...</div>
+    }
+    else if (product == null)
+    {
+        <div class="empty-box">
+            <strong>Producto no encontrado.</strong>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="alert-success">@successMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert-error">@errorMessage</div>
+        }
+
+        <div class="detail-card">
+            <div class="detail-image">
+                @if (!string.IsNullOrWhiteSpace(product.Image))
+                {
+                    <img src="@product.Image" alt="@product.Name" />
+                }
+                else
+                {
+                    <div class="image-placeholder-lg">
+                        @(string.IsNullOrEmpty(product.Name) ? "?" : product.Name[..1].ToUpper())
+                    </div>
+                }
+            </div>
+
+            <div class="detail-info">
+                <span class="category-badge">@product.CategoryName</span>
+                <h1>@product.Name</h1>
+
+                <p class="detail-price">Bs @product.Price.ToString("N2")</p>
+
+                @if (!string.IsNullOrWhiteSpace(product.Description))
+                {
+                    <p class="detail-description">@product.Description</p>
+                }
+
+                <div class="detail-stock">
+                    @if (product.CurrentStock > 0)
+                    {
+                        <span class="stock-available">
+                            Disponible (@product.CurrentStock en stock)
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="stock-unavailable">Sin stock disponible</span>
+                    }
+                </div>
+
+                @if (product.CurrentStock > 0)
+                {
+                    <div class="quantity-section">
+                        <label>Cantidad:</label>
+                        <div class="quantity-controls">
+                            <button class="qty-btn"
+                                    @onclick="() => ChangeQty(-1)"
+                                    disabled="@(quantity <= 1)">
+                                −
+                            </button>
+                            <span class="qty-value">@quantity</span>
+                            <button class="qty-btn"
+                                    @onclick="() => ChangeQty(1)"
+                                    disabled="@(quantity >= product.CurrentStock)">
+                                +
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="subtotal">
+                        Subtotal: <strong>Bs @((product.Price * quantity).ToString("N2"))</strong>
+                    </p>
+
+                    <button class="btn-add-cart"
+                            @onclick="AddToCart"
+                            disabled="@adding">
+                        @(adding ? "Agregando..." : "Agregar al carrito")
+                    </button>
+                }
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ProductDto? product;
+    private bool loading = true;
+    private bool adding;
+    private int quantity = 1;
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProduct();
+    }
+
+    private async Task LoadProduct()
+    {
+        try
+        {
+            loading = true;
+            product = await InventoryService.GetProductByIdAsync(Id);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudo cargar el producto.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void ChangeQty(int delta)
+    {
+        var newQty = quantity + delta;
+        if (newQty >= 1 && product != null && newQty <= product.CurrentStock)
+        {
+            quantity = newQty;
+        }
+    }
+
+    private async Task AddToCart()
+    {
+        adding = true;
+        successMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            var result = await CartService.AddToCartAsync(new AddToCartRequest
+            {
+                ProductId = Id,
+                Quantity = quantity
+            });
+
+            if (result != null)
+            {
+                successMessage = "Producto agregado al carrito correctamente.";
+                quantity = 1;
+            }
+            else
+            {
+                errorMessage = "No se pudo agregar el producto al carrito.";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al agregar al carrito.";
+        }
+        finally
+        {
+            adding = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/catalogo");
+    }
+}

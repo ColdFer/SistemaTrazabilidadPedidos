@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using TrazabilidadPedidos.Server.Data;
 using TrazabilidadPedidos.Server.Repositories;
 using TrazabilidadPedidos.Shared.DTOs;
 using TrazabilidadPedidos.Shared.Entities;
@@ -13,15 +15,18 @@ namespace TrazabilidadPedidos.Server.Services
         private readonly IUserRepository _userRepository;
         private readonly IRoleRepository _roleRepository;
         private readonly IConfiguration _configuration;
+        private readonly AppDbContext _context;
 
         public AuthService(
             IUserRepository userRepository,
             IRoleRepository roleRepository,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            AppDbContext context)
         {
             _userRepository = userRepository;
             _roleRepository = roleRepository;
             _configuration = configuration;
+            _context = context;
         }
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
@@ -31,6 +36,11 @@ namespace TrazabilidadPedidos.Server.Services
             if (user == null)
             {
                 return null;
+            }
+
+            if (!user.IsActive)
+            {
+                throw new UnauthorizedAccessException("Su cuenta ha sido desactivada. Contacte al administrador.");
             }
 
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
@@ -72,6 +82,18 @@ namespace TrazabilidadPedidos.Server.Services
 
             var createdUser =
                 await _userRepository.CreateUserAsync(user);
+
+            var customer = new Customer
+            {
+                UserId = createdUser.Id,
+                Ci = $"CLI-{createdUser.Id:D8}",
+                Phone = "000000000",
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
+            };
+
+            _context.Customers.Add(customer);
+            await _context.SaveChangesAsync();
 
             return GenerateAuthResponse(createdUser);
         }

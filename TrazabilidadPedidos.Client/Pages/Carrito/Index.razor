@@ -1,0 +1,196 @@
+@page "/carrito"
+@inject CartClientService CartService
+@inject NavigationManager Navigation
+
+<PageTitle>Mi Carrito</PageTitle>
+
+<div class="cart-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Mi Carrito</h1>
+            <p>Revisa los productos antes de confirmar tu compra.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">@errorMessage</div>
+    }
+
+    @if (loading)
+    {
+        <div class="loading-box">Cargando carrito...</div>
+    }
+    else if (cart == null || !cart.Items.Any())
+    {
+        <div class="empty-cart">
+            <div class="empty-icon">🛒</div>
+            <strong>Tu carrito está vacío</strong>
+            <p>Explora nuestro catálogo para agregar productos.</p>
+            <button class="btn-primary" @onclick="IrCatalogo">
+                Ver catálogo
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="cart-content">
+            <div class="cart-items-card">
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Precio</th>
+                            <th>Cantidad</th>
+                            <th>Subtotal</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in cart.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="product-cell">
+                                        <div class="product-thumb">
+                                            @(string.IsNullOrEmpty(item.ProductName) ? "?" : item.ProductName[..1].ToUpper())
+                                        </div>
+                                        <div>
+                                            <strong>@item.ProductName</strong>
+                                            <span>@item.ProductCode</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>Bs @item.UnitPrice.ToString("N2")</td>
+                                <td>
+                                    <div class="qty-controls">
+                                        <button class="qty-btn"
+                                                @onclick="() => UpdateQty(item.Id, item.Quantity - 1)"
+                                                disabled="@(item.Quantity <= 1)">
+                                            −
+                                        </button>
+                                        <span>@item.Quantity</span>
+                                        <button class="qty-btn"
+                                                @onclick="() => UpdateQty(item.Id, item.Quantity + 1)"
+                                                disabled="@(item.Quantity >= item.AvailableStock)">
+                                            +
+                                        </button>
+                                    </div>
+                                </td>
+                                <td><strong>Bs @item.Subtotal.ToString("N2")</strong></td>
+                                <td>
+                                    <button class="btn-remove"
+                                            @onclick="() => RemoveItem(item.Id)">
+                                        ×
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="cart-summary">
+                <h3>Resumen del pedido</h3>
+
+                <div class="summary-row">
+                    <span>Productos (@cart.TotalItems)</span>
+                    <span>Bs @cart.Total.ToString("N2")</span>
+                </div>
+
+                <div class="summary-row total">
+                    <span>Total</span>
+                    <span>Bs @cart.Total.ToString("N2")</span>
+                </div>
+
+                <button class="btn-checkout"
+                        @onclick="ConfirmPurchase"
+                        disabled="@(!cart.Items.Any())">
+                    Confirmar compra
+                </button>
+
+                <button class="btn-continue" @onclick="IrCatalogo">
+                    Seguir comprando
+                </button>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private CartDto? cart;
+    private bool loading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCart();
+    }
+
+    private async Task LoadCart()
+    {
+        try
+        {
+            loading = true;
+            cart = await CartService.GetCartAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudo cargar el carrito.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task UpdateQty(int itemId, int newQty)
+    {
+        if (newQty < 1) return;
+        try
+        {
+            cart = await CartService.UpdateQuantityAsync(
+                itemId, new UpdateCartItemRequest { Quantity = newQty });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudo actualizar la cantidad.";
+        }
+    }
+
+    private async Task RemoveItem(int itemId)
+    {
+        try
+        {
+            cart = await CartService.RemoveFromCartAsync(itemId);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "No se pudo eliminar el producto.";
+        }
+    }
+
+    private void ConfirmPurchase()
+    {
+        Navigation.NavigateTo("/carrito/confirmar");
+    }
+
+    private void IrCatalogo()
+    {
+        Navigation.NavigateTo("/catalogo");
+    }
+}

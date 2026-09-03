@@ -1,0 +1,162 @@
+@page "/facturas/{Id:int}"
+@inject InvoiceClientService InvoiceService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Factura</PageTitle>
+
+<div class="invoice-page">
+    @if (loading)
+    {
+        <div class="loading-box">Cargando factura...</div>
+    }
+    else if (invoice == null)
+    {
+        <div class="empty-state">
+            <strong>Factura no encontrada.</strong>
+            <button class="btn-back" @onclick="Volver">Volver</button>
+        </div>
+    }
+    else
+    {
+        <div class="invoice-actions no-print">
+            <button class="btn-back" @onclick="Volver">← Volver</button>
+            <button class="btn-print" @onclick="PrintInvoice">Imprimir</button>
+            <button class="btn-download" @onclick="DownloadPdf" disabled="@downloading">
+                @(downloading ? "Generando..." : "Descargar PDF")
+            </button>
+        </div>
+
+        <div class="invoice-doc" id="invoice-doc">
+            <div class="invoice-header">
+                <div class="company-info">
+                    <h2>NovaTec</h2>
+                    <p>Sistema de Gestión y Trazabilidad de Pedidos</p>
+                    <p>NIT: 123456789</p>
+                </div>
+                <div class="invoice-code">
+                    <h3>FACTURA</h3>
+                    <p><strong>@invoice.Code</strong></p>
+                    <p>Fecha: @invoice.InvoiceDate.ToString("dd/MM/yyyy")</p>
+                </div>
+            </div>
+
+            <div class="invoice-parties">
+                <div class="party">
+                    <h4>Cliente:</h4>
+                    <p><strong>@invoice.RazonSocial</strong></p>
+                    <p>CI/NIT: @invoice.Nit</p>
+                    @if (!string.IsNullOrEmpty(invoice.Direccion))
+                    {
+                        <p>Dirección: @invoice.Direccion</p>
+                    }
+                </div>
+            </div>
+
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Producto</th>
+                        <th>Código</th>
+                        <th>Cantidad</th>
+                        <th>Precio Unitario</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (invoice.Details != null)
+                    {
+                        var index = 1;
+                        @foreach (var detail in invoice.Details)
+                        {
+                            <tr>
+                                <td>@(index++)</td>
+                                <td>@detail.ProductName</td>
+                                <td>@detail.ProductCode</td>
+                                <td>@detail.Quantity</td>
+                                <td>Bs @detail.UnitPrice.ToString("N2")</td>
+                                <td>Bs @detail.Subtotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            <div class="invoice-totals">
+                <div class="total-row">
+                    <span>Subtotal:</span>
+                    <strong>Bs @invoice.Subtotal.ToString("N2")</strong>
+                </div>
+                <div class="total-row">
+                    <span>IVA (13%):</span>
+                    <strong>Bs @invoice.IvaAmount.ToString("N2")</strong>
+                </div>
+                <div class="total-row total-final">
+                    <span>TOTAL:</span>
+                    <strong>Bs @invoice.Total.ToString("N2")</strong>
+                </div>
+            </div>
+
+            <div class="invoice-footer">
+                <p>Gracias por su compra - NovaTec</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Invoice? invoice;
+    private bool loading = true;
+    private bool downloading;
+    private bool isStaff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await JS.InvokeAsync<string>("localStorage.getItem", "userRole") ?? "";
+        isStaff = role == "Administrator" || role == "Operator" || role == "DeliveryDriver";
+
+        try
+        {
+            invoice = await InvoiceService.GetByIdAsync(Id);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo(isStaff ? "/pedidos" : "/mis-pedidos");
+    }
+
+    private async Task PrintInvoice()
+    {
+        await JS.InvokeVoidAsync("print");
+    }
+
+    private async Task DownloadPdf()
+    {
+        if (invoice == null) return;
+        downloading = true;
+        try
+        {
+            await InvoiceService.DownloadPdfAsync(invoice.Id);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error downloading PDF: {ex.Message}");
+        }
+        finally
+        {
+            downloading = false;
+        }
+    }
+}

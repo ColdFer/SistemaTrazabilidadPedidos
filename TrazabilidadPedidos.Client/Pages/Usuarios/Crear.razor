@@ -1,0 +1,212 @@
+﻿@page "/usuarios/crear"
+
+@using TrazabilidadPedidos.Client.Services
+@using TrazabilidadPedidos.Shared.DTOs.Users
+
+@inject ManagedUserClientService UserService
+@inject NavigationManager Navigation
+
+<PageTitle>Nuevo usuario</PageTitle>
+
+<div class="create-page">
+
+    <div class="page-header">
+
+        <div>
+            <h1>Nuevo usuario</h1>
+            <p>Crear una cuenta para administradores, operadores o repartidores.</p>
+        </div>
+
+        <button class="btn-back"
+                @onclick="Volver">
+            ← Volver
+        </button>
+
+    </div>
+
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error">
+            @errorMessage
+        </div>
+    }
+
+
+    <div class="form-card">
+
+        <EditForm Model="model"
+                  OnValidSubmit="GuardarAsync">
+
+            <DataAnnotationsValidator />
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label>Nombre</label>
+
+                    <InputText class="form-control"
+                               @bind-Value="model.FirstName" />
+
+                    <ValidationMessage For="@(() => model.FirstName)" />
+                </div>
+
+
+                <div class="form-group">
+                    <label>Apellido</label>
+
+                    <InputText class="form-control"
+                               @bind-Value="model.LastName" />
+
+                    <ValidationMessage For="@(() => model.LastName)" />
+                </div>
+
+
+                <div class="form-group full-width">
+                    <label>Correo electrónico</label>
+
+                    <InputText class="form-control"
+                               @bind-Value="model.Email" />
+
+                    <ValidationMessage For="@(() => model.Email)" />
+                </div>
+
+
+                <div class="form-group">
+                    <label>Rol</label>
+
+                    <InputSelect class="form-control"
+                                 @bind-Value="model.RoleName">
+
+                        <option value="">Seleccione</option>
+
+                        <option value="Administrator">
+                            Administrador
+                        </option>
+
+                        <option value="Operator">
+                            Operador
+                        </option>
+
+                        <option value="DeliveryDriver">
+                            Repartidor
+                        </option>
+
+                    </InputSelect>
+
+                    <ValidationMessage For="@(() => model.RoleName)" />
+                </div>
+
+
+                @if (model.RoleName == "DeliveryDriver")
+                {
+                    <div class="form-group">
+                        <label>Teléfono</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="model.Phone" />
+
+                        <ValidationMessage For="@(() => model.Phone)" />
+                    </div>
+                }
+
+
+                <div class="form-group">
+                    <label>Contraseña</label>
+
+                    <InputText type="password"
+                               class="form-control"
+                               @bind-Value="model.Password" />
+
+                    <ValidationMessage For="@(() => model.Password)" />
+                </div>
+
+
+                <div class="form-group">
+                    <label>Confirmar contraseña</label>
+
+                    <InputText type="password"
+                               class="form-control"
+                               @bind-Value="model.ConfirmPassword" />
+
+                    <ValidationMessage For="@(() => model.ConfirmPassword)" />
+                </div>
+
+            </div>
+
+
+            <div class="actions">
+
+                <button type="button"
+                        class="btn-cancel"
+                        @onclick="Volver">
+                    Cancelar
+                </button>
+
+                <button type="submit"
+                        class="btn-save"
+                        disabled="@saving">
+
+                    @(saving ? "Guardando..." : "Crear usuario")
+
+                </button>
+
+            </div>
+
+        </EditForm>
+
+    </div>
+
+</div>
+
+@code {
+
+    private CreateManagedUserRequest model = new();
+
+    private bool saving;
+
+    private string? errorMessage;
+
+    private async Task GuardarAsync()
+    {
+        errorMessage = null;
+        saving = true;
+
+        try
+        {
+            if (model.Password != model.ConfirmPassword)
+            {
+                errorMessage = "Las contraseñas no coinciden.";
+                return;
+            }
+
+            var result = await UserService.CreateAsync(model);
+
+            if (result == null)
+            {
+                errorMessage = "No fue posible crear el usuario.";
+                return;
+            }
+
+            Navigation.NavigateTo("/usuarios");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage = "Error al crear el usuario.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/usuarios");
+    }
+
+}

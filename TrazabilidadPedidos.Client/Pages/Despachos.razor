@@ -1,0 +1,1127 @@
+﻿@page "/despachos"
+
+@using TrazabilidadPedidos.Client.Services
+@using TrazabilidadPedidos.Shared.DTOs.Dispatches
+
+@inject DeliveryClientService DeliveryService
+@inject NavigationManager Navigation
+
+<PageTitle>Despachos</PageTitle>
+
+<div class="deliveries-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Despachos</h1>
+            <p>Programa y controla las entregas de los pedidos.</p>
+        </div>
+
+        <button class="btn-primary-custom"
+                @onclick="OpenCreateForm">
+            + Programar despacho
+        </button>
+    </div>
+
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert-success-custom">
+            @successMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert-error-custom">
+            @errorMessage
+        </div>
+    }
+
+
+    <div class="summary-grid">
+
+        <div class="summary-card">
+            <span>TOTAL</span>
+            <strong>@deliveries.Count</strong>
+            <small>Despachos registrados</small>
+        </div>
+
+        <div class="summary-card">
+            <span>PENDIENTES</span>
+            <strong>@deliveries.Count(d => d.Status == 1 || d.Status == 2 || d.Status == 3)</strong>
+            <small>Por despachar</small>
+        </div>
+
+        <div class="summary-card">
+            <span>EN RUTA</span>
+            <strong>@deliveries.Count(d => d.Status == 4)</strong>
+            <small>Entregas en curso</small>
+        </div>
+
+        <div class="summary-card">
+            <span>ENTREGADOS</span>
+            <strong>@deliveries.Count(d => d.Status == 5)</strong>
+            <small>Completados</small>
+        </div>
+
+    </div>
+
+
+    @if (showCreateForm)
+    {
+        <div class="form-card">
+
+            <div class="form-header">
+                <div>
+                    <h3>Programar despacho</h3>
+                    <p>Selecciona el pedido, dirección y programación de entrega.</p>
+                </div>
+
+                <button class="close-button"
+                        @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            @if (!orders.Any())
+            {
+                <div class="information-box">
+                    No existen pedidos disponibles para programar.
+                </div>
+            }
+            else
+            {
+                <EditForm Model="createModel"
+                          OnValidSubmit="CreateDeliveryAsync">
+
+                    <DataAnnotationsValidator />
+
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label>Pedido</label>
+
+                            <select class="form-control"
+                                    @bind="createModel.OrderId"
+                                    @bind:after="CreateOrderChanged">
+
+                                <option value="0">
+                                    Seleccione un pedido
+                                </option>
+
+                                @foreach (var order in orders)
+                                {
+                                    <option value="@order.Id">
+                                        @order.Code - @order.CustomerName
+                                    </option>
+                                }
+
+                            </select>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Direccion de entrega (del pedido)</label>
+                            <input class="form-control readonly-field"
+                                   value="@(FormatAddress(selectedOrderForCreate))"
+                                   readonly />
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Referencia (del pedido)</label>
+                            <input class="form-control readonly-field"
+                                   value="@(string.IsNullOrWhiteSpace(selectedOrderForCreate?.DeliveryReference) ? "Sin referencia" : selectedOrderForCreate?.DeliveryReference)"
+                                   readonly />
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Nombre del receptor (del pedido)</label>
+                            <input class="form-control readonly-field"
+                                   value="@(selectedOrderForCreate?.CustomerFullName ?? "")"
+                                   readonly />
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Telefono de contacto (del pedido)</label>
+                            <input class="form-control readonly-field"
+                                   value="@(selectedOrderForCreate?.CustomerPhone ?? "")"
+                                   readonly />
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Repartidor</label>
+
+                            <select class="form-control"
+                                    @bind="createModel.DeliveryDriverId">
+
+                                <option value="">
+                                    Sin asignar
+                                </option>
+
+                                @foreach (var driver in drivers.Where(d => d.IsAvailable))
+                                {
+                                    <option value="@driver.Id">
+                                        @driver.FullName
+                                    </option>
+                                }
+
+                            </select>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Fecha programada</label>
+
+                            <InputDate class="form-control"
+                                       @bind-Value="createModel.ScheduledDate" />
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Hora inicial</label>
+
+                            <InputText type="time"
+                                       class="form-control"
+                                       @bind-Value="createStartTime" />
+                        </div>
+
+
+                        <div class="form-group">
+                            <label>Hora final</label>
+
+                            <InputText type="time"
+                                       class="form-control"
+                                       @bind-Value="createEndTime" />
+                        </div>
+
+
+                        <div class="form-group full-width">
+                            <label>Observacion</label>
+
+                            <InputText class="form-control"
+                                       @bind-Value="createModel.Observation" />
+                        </div>
+
+                    </div>
+
+
+                    <div class="information-box">
+                        El despacho se registrará inicialmente con estado
+                        <strong>Pendiente</strong>.
+                    </div>
+
+
+                    <div class="form-actions">
+
+                        <button type="button"
+                                class="btn-cancel"
+                                @onclick="CloseForms">
+                            Cancelar
+                        </button>
+
+                        <button type="submit"
+                                class="btn-save"
+                                disabled="@saving">
+                            @(saving ? "Guardando..." : "Programar despacho")
+                        </button>
+
+                    </div>
+
+                </EditForm>
+            }
+
+        </div>
+    }
+
+
+    @if (showEditForm)
+    {
+        <div class="form-card">
+
+            <div class="form-header">
+                <div>
+                    <h3>Editar despacho</h3>
+                    <p>Modifica la programación y asignación del despacho.</p>
+                </div>
+
+                <button class="close-button"
+                        @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            <EditForm Model="updateModel"
+                      OnValidSubmit="UpdateDeliveryAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Dirección</label>
+
+                        <select class="form-control"
+                                @bind="updateModel.AddressId">
+
+                            @foreach (var address in EditAddresses)
+                            {
+                                <option value="@address.Id">
+                                    @address.AddressLine
+                                </option>
+                            }
+
+                        </select>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>Repartidor</label>
+
+                        <select class="form-control"
+                                @bind="updateModel.DeliveryDriverId">
+
+                            <option value="">
+                                Sin asignar
+                            </option>
+
+                            @foreach (var driver in AvailableDriversForEdit)
+                            {
+                                <option value="@driver.Id">
+                                    @driver.FullName
+                                </option>
+                            }
+
+                        </select>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>Fecha programada</label>
+
+                        <InputDate class="form-control"
+                                   @bind-Value="updateModel.ScheduledDate" />
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>Hora inicial</label>
+
+                        <InputText type="time"
+                                   class="form-control"
+                                   @bind-Value="editStartTime" />
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>Hora final</label>
+
+                        <InputText type="time"
+                                   class="form-control"
+                                   @bind-Value="editEndTime" />
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>Receptor</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.RecipientName" />
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>Teléfono</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.ContactPhone" />
+                    </div>
+
+
+                    <div class="form-group full-width">
+                        <label>Observación</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="updateModel.Observation" />
+                    </div>
+
+                </div>
+
+
+                <div class="form-actions">
+
+                    <button type="button"
+                            class="btn-cancel"
+                            @onclick="CloseForms">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn-save"
+                            disabled="@saving">
+                        @(saving ? "Guardando..." : "Guardar cambios")
+                    </button>
+
+                </div>
+
+            </EditForm>
+
+        </div>
+    }
+
+
+    @if (showStatusForm)
+    {
+        <div class="form-card status-form">
+
+            <div class="form-header">
+                <div>
+                    <h3>Cambiar estado</h3>
+                    <p>
+                        Despacho del pedido
+                        <strong>@selectedDelivery?.OrderCode</strong>
+                    </p>
+                </div>
+
+                <button class="close-button"
+                        @onclick="CloseForms">
+                    ×
+                </button>
+            </div>
+
+            <EditForm Model="statusModel"
+                      OnValidSubmit="ChangeStatusAsync">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label>Nuevo estado</label>
+
+                        <InputSelect class="form-control"
+                                     @bind-Value="statusModel.Status">
+
+                            <option value="1">Pendiente</option>
+                            <option value="2">Programado</option>
+                            <option value="3">Asignado</option>
+                            <option value="4">En ruta</option>
+                            <option value="5">Entregado</option>
+                            <option value="6">Fallido</option>
+                            <option value="7">Cancelado</option>
+
+                        </InputSelect>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>Observación</label>
+
+                        <InputText class="form-control"
+                                   @bind-Value="statusModel.Observation" />
+                    </div>
+
+                </div>
+
+
+                @if (statusModel.Status == 4 ||
+                     statusModel.Status == 5)
+                {
+                    <div class="information-box">
+                        Para utilizar este estado el despacho debe tener
+                        un repartidor asignado.
+                    </div>
+                }
+
+
+                <div class="form-actions">
+
+                    <button type="button"
+                            class="btn-cancel"
+                            @onclick="CloseForms">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn-save"
+                            disabled="@saving">
+                        @(saving ? "Actualizando..." : "Actualizar estado")
+                    </button>
+
+                </div>
+
+            </EditForm>
+
+        </div>
+    }
+
+
+    <div class="content-card">
+
+        <div class="toolbar">
+
+            <div class="search-box">
+                <span>⌕</span>
+
+                <input type="text"
+                       placeholder="Buscar por pedido, cliente o repartidor..."
+                       @bind="searchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <select class="status-filter"
+                    @bind="statusFilter">
+
+                <option value="0">Todos los estados</option>
+                <option value="1">Pendiente</option>
+                <option value="4">En ruta</option>
+                <option value="5">Entregado</option>
+                <option value="6">Fallido</option>
+                <option value="7">Cancelado</option>
+
+            </select>
+
+        </div>
+
+
+        @if (loading)
+        {
+            <div class="empty-state">
+                Cargando despachos...
+            </div>
+        }
+        else if (!FilteredDeliveries.Any())
+        {
+            <div class="empty-state">
+                <strong>No se encontraron despachos.</strong>
+                <span>Programa un despacho para comenzar.</span>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+
+                <table class="deliveries-table">
+
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Dirección</th>
+                            <th>Repartidor</th>
+                            <th>Programación</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (var delivery in FilteredDeliveries)
+                        {
+                            <tr>
+
+                                <td>
+                                    <div class="order-code">
+                                        @delivery.OrderCode
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <strong class="primary-text">
+                                        @delivery.CustomerName
+                                    </strong>
+
+                                    <div class="secondary-text">
+                                        @delivery.RecipientName
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <div class="address-cell">
+                                        @delivery.Address
+                                    </div>
+
+                                    <div class="secondary-text">
+                                        @delivery.ContactPhone
+                                    </div>
+                                </td>
+
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(
+                                        delivery.DeliveryDriverName))
+                                    {
+                                        <span class="not-assigned">
+                                            Sin asignar
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="primary-text">
+                                            @delivery.DeliveryDriverName
+                                        </span>
+                                    }
+                                </td>
+
+                                <td>
+                                    <strong class="primary-text">
+                                        @delivery.ScheduledDate.ToString("dd/MM/yyyy")
+                                    </strong>
+
+                                    @if (delivery.StartTime.HasValue ||
+                                         delivery.EndTime.HasValue)
+                                    {
+                                        <div class="secondary-text">
+                                            @FormatTimeRange(delivery)
+                                        </div>
+                                    }
+                                </td>
+
+                                <td>
+                                    <span class="@GetStatusClass(delivery.Status)">
+                                        @delivery.StatusName
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="action-buttons">
+
+                                        @if (delivery.Status != 5 &&
+                                             delivery.Status != 7)
+                                        {
+                                            <button class="btn-edit"
+                                                    @onclick="() => OpenEditForm(delivery)">
+                                                Editar
+                                            </button>
+                                        }
+
+                                        <button class="btn-status"
+                                                @onclick="() => OpenStatusForm(delivery)">
+                                            Estado
+                                        </button>
+
+                                    </div>
+                                </td>
+
+                            </tr>
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+        }
+
+    </div>
+
+</div>
+
+
+@code {
+    private List<DeliveryDto> deliveries = new();
+    private List<DeliveryOrderDto> orders = new();
+    private List<DeliveryAddressDto> addresses = new();
+    private List<DeliveryDriverDto> drivers = new();
+
+    private CreateDeliveryRequest createModel =
+        new()
+        {
+            ScheduledDate = DateTime.Today.AddDays(1)
+        };
+
+    private UpdateDeliveryRequest updateModel = new();
+
+    private ChangeDeliveryStatusRequest statusModel =
+        new()
+        {
+            Status = 1
+        };
+
+    private DeliveryDto? selectedDelivery;
+    private DeliveryOrderDto? selectedOrderForCreate;
+
+    private int editingDeliveryId;
+    private int editingCustomerId;
+    private string createStartTime = string.Empty;
+    private string createEndTime = string.Empty;
+
+    private string editStartTime = string.Empty;
+    private string editEndTime = string.Empty;
+
+    private string searchTerm = string.Empty;
+
+    private int statusFilter;
+
+    private bool loading = true;
+    private bool saving;
+
+    private bool showCreateForm;
+    private bool showEditForm;
+    private bool showStatusForm;
+
+    private string? successMessage;
+    private string? errorMessage;
+
+
+    private IEnumerable<DeliveryAddressDto> CreateAddresses
+    {
+        get
+        {
+            var order =
+                orders.FirstOrDefault(
+                    o => o.Id == createModel.OrderId);
+
+            if (order == null)
+                return Enumerable.Empty<DeliveryAddressDto>();
+
+            return addresses.Where(
+                a => a.CustomerId == order.CustomerId);
+        }
+    }
+
+
+    private IEnumerable<DeliveryAddressDto> EditAddresses =>
+        addresses.Where(
+            a => a.CustomerId == editingCustomerId);
+
+
+    private IEnumerable<DeliveryDriverDto>
+        AvailableDriversForEdit
+    {
+        get
+        {
+            return drivers.Where(d =>
+                d.IsAvailable ||
+                d.Id == updateModel.DeliveryDriverId);
+        }
+    }
+
+
+    private IEnumerable<DeliveryDto> FilteredDeliveries
+    {
+        get
+        {
+            IEnumerable<DeliveryDto> result = deliveries;
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var search = searchTerm.Trim();
+
+                result = result.Where(d =>
+                    d.OrderCode.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                    ||
+                    d.CustomerName.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase)
+                    ||
+                    (!string.IsNullOrEmpty(d.DeliveryDriverName)
+                        && d.DeliveryDriverName.Contains(
+                            search,
+                            StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (statusFilter > 0)
+            {
+                result =
+                    result.Where(
+                        d => d.Status == statusFilter);
+            }
+
+            return result;
+        }
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            loading = true;
+
+            deliveries =
+                await DeliveryService.GetAllAsync();
+
+            orders =
+                await DeliveryService.GetOrdersAsync();
+
+            addresses =
+                await DeliveryService.GetAddressesAsync();
+
+            drivers =
+                await DeliveryService.GetDriversAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "No se pudo cargar la información de despachos.";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+
+    private void OpenCreateForm()
+    {
+        ClearMessages();
+        CloseForms();
+
+        createModel =
+            new CreateDeliveryRequest
+            {
+                ScheduledDate = DateTime.Today.AddDays(1)
+            };
+
+        createStartTime = string.Empty;
+        createEndTime = string.Empty;
+
+        showCreateForm = true;
+    }
+
+
+    private void CreateOrderChanged()
+    {
+        selectedOrderForCreate = orders.FirstOrDefault(
+            o => o.Id == createModel.OrderId);
+
+        if (selectedOrderForCreate != null)
+        {
+            createModel.RecipientName = selectedOrderForCreate.CustomerFullName ?? "";
+            createModel.ContactPhone = selectedOrderForCreate.CustomerPhone ?? "";
+        }
+        else
+        {
+            createModel.RecipientName = "";
+            createModel.ContactPhone = "";
+        }
+    }
+
+
+    private void OpenEditForm(
+        DeliveryDto delivery)
+    {
+        ClearMessages();
+        CloseForms();
+
+        editingDeliveryId = delivery.Id;
+
+        var order =
+            orders.FirstOrDefault(
+                o => o.Id == delivery.OrderId);
+
+        editingCustomerId =
+            order?.CustomerId ?? 0;
+
+        updateModel =
+            new UpdateDeliveryRequest
+            {
+                AddressId = delivery.AddressId ?? 0,
+
+                DeliveryDriverId =
+                    delivery.DeliveryDriverId,
+
+                ScheduledDate =
+                    delivery.ScheduledDate,
+
+                StartTime =
+                    delivery.StartTime,
+
+                EndTime =
+                    delivery.EndTime,
+
+                ContactPhone =
+                    delivery.ContactPhone,
+
+                RecipientName =
+                    delivery.RecipientName,
+
+                Observation =
+                    delivery.Observation
+            };
+        editStartTime =
+FormatTimeForInput(delivery.StartTime);
+
+        editEndTime =
+            FormatTimeForInput(delivery.EndTime);
+
+
+        showEditForm = true;
+    }
+
+
+    private void OpenStatusForm(
+        DeliveryDto delivery)
+    {
+        ClearMessages();
+        CloseForms();
+
+        selectedDelivery = delivery;
+
+        statusModel =
+            new ChangeDeliveryStatusRequest
+            {
+                Status = delivery.Status,
+
+                Observation =
+                    delivery.Observation
+            };
+
+        showStatusForm = true;
+    }
+
+
+    private void CloseForms()
+    {
+        showCreateForm = false;
+        showEditForm = false;
+        showStatusForm = false;
+    }
+
+
+    private async Task CreateDeliveryAsync()
+    {
+        ClearMessages();
+
+        if (createModel.OrderId <= 0)
+        {
+            errorMessage =
+                "Debe seleccionar un pedido.";
+
+            return;
+        }
+
+        try
+        {
+            saving = true;
+            createModel.StartTime =
+    ParseTime(createStartTime);
+
+            createModel.EndTime =
+                ParseTime(createEndTime);
+            var result =
+                await DeliveryService
+                    .CreateAsync(createModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo programar el despacho. Verifica el pedido, dirección y repartidor.";
+
+                return;
+            }
+
+            successMessage =
+                "Despacho programado correctamente.";
+
+            CloseForms();
+
+            await LoadDataAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al programar el despacho.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+    private async Task UpdateDeliveryAsync()
+    {
+        ClearMessages();
+
+        if (updateModel.AddressId <= 0)
+        {
+            errorMessage =
+                "Debe seleccionar una dirección.";
+
+            return;
+        }
+
+        try
+        {
+            saving = true;
+
+            updateModel.StartTime = ParseTime(editStartTime);
+            updateModel.EndTime = ParseTime(editEndTime);
+
+            var result = await DeliveryService.UpdateAsync(
+                editingDeliveryId,
+                updateModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo actualizar el despacho.";
+
+                return;
+            }
+
+            successMessage =
+                "Despacho actualizado correctamente.";
+
+            CloseForms();
+
+            await LoadDataAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al actualizar el despacho.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+    private static TimeSpan? ParseTime(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        return TimeSpan.TryParse(
+            value,
+            out var time)
+                ? time
+                : null;
+    }
+
+    private static string FormatTimeForInput(
+        TimeSpan? value)
+    {
+        if (!value.HasValue)
+            return string.Empty;
+
+        return value.Value.ToString(@"hh\:mm");
+    }
+
+    private async Task ChangeStatusAsync()
+    {
+        ClearMessages();
+
+        if (selectedDelivery == null)
+            return;
+
+        try
+        {
+            saving = true;
+
+            var result =
+                await DeliveryService.ChangeStatusAsync(
+                    selectedDelivery.Id,
+                    statusModel);
+
+            if (result == null)
+            {
+                errorMessage =
+                    "No se pudo cambiar el estado. Verifica que exista un repartidor asignado cuando sea necesario.";
+
+                return;
+            }
+
+            successMessage =
+                $"Estado actualizado a {result.StatusName}.";
+
+            CloseForms();
+
+            await LoadDataAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        catch
+        {
+            errorMessage =
+                "Ocurrió un error al cambiar el estado.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+
+
+
+    private static string FormatTimeRange(
+    DeliveryDto delivery)
+    {
+        var start =
+            delivery.StartTime.HasValue
+                ? delivery.StartTime.Value.ToString(@"hh\:mm")
+                : "--:--";
+
+        var end =
+            delivery.EndTime.HasValue
+                ? delivery.EndTime.Value.ToString(@"hh\:mm")
+                : "--:--";
+
+        return $"{start} - {end}";
+    }
+
+
+    private static string GetStatusClass(int status)
+    {
+        return status switch
+        {
+            1 => "status-badge pending",
+            2 => "status-badge scheduled",
+            3 => "status-badge assigned",
+            4 => "status-badge route",
+            5 => "status-badge delivered",
+            6 => "status-badge failed",
+            7 => "status-badge cancelled",
+            _ => "status-badge"
+        };
+    }
+
+
+    private void ClearMessages()
+    {
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private static string FormatAddress(DeliveryOrderDto? order)
+    {
+        if (order == null)
+            return "Seleccione un pedido";
+
+        if (!string.IsNullOrWhiteSpace(order.DeliveryAddress))
+            return order.DeliveryAddress;
+
+        if (order.DeliveryLatitude.HasValue && order.DeliveryLongitude.HasValue)
+            return $"Lat: {order.DeliveryLatitude.Value:F4}, Lng: {order.DeliveryLongitude.Value:F4}";
+
+        return "Sin direccion";
+    }
+}

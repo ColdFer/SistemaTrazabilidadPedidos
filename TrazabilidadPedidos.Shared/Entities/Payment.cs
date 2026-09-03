@@ -14,7 +14,11 @@ namespace TrazabilidadPedidos.Shared.Entities
 
         public decimal Amount { get; set; }
 
+        public string? TransactionCode { get; set; }
+
         public string? Receipt { get; set; }
+
+        public string? ProofImage { get; set; }
 
         public DateTime PaymentDate { get; set; } = DateTime.Now;
 

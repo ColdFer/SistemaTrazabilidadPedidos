@@ -1,0 +1,88 @@
+.invoice-page { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+
+.invoice-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.btn-back {
+    background: white;
+    color: #5b6b7d;
+    border: 1px solid #e0e6ed;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-print {
+    background: #3478d4;
+    color: white;
+    border: none;
+    padding: 0.5rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-print:hover { background: #2563c4; }
+
+.invoice-doc {
+    background: white;
+    border: 1px solid #e0e6ed;
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+.invoice-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #17324d;
+}
+
+.company-info h2 { color: #17324d; margin: 0 0 0.25rem; }
+.company-info p { color: #5b6b7d; margin: 0.125rem 0; font-size: 0.875rem; }
+
+.invoice-code { text-align: right; }
+.invoice-code h3 { color: #3478d4; margin: 0 0 0.25rem; }
+.invoice-code p { margin: 0.125rem 0; font-size: 0.875rem; }
+
+.invoice-parties { margin-bottom: 1.5rem; }
+.party h4 { color: #5b6b7d; margin: 0 0 0.25rem; font-size: 0.875rem; }
+.party p { margin: 0.125rem 0; font-size: 0.875rem; }
+
+.invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+}
+
+.invoice-table th {
+    background: #17324d;
+    color: white;
+    padding: 0.5rem;
+    text-align: left;
+    font-size: 0.8rem;
+}
+
+.invoice-table td {
+    padding: 0.5rem;
+    border-bottom: 1px solid #e0e6ed;
+    font-size: 0.875rem;
+}
+
+.invoice-totals { float: right; width: 250px; }
+.total-row { display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.9rem; }
+.total-final { border-top: 2px solid #17324d; padding-top: 0.5rem; font-size: 1.1rem; color: #17324d; }
+
+.invoice-footer { clear: both; text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e6ed; color: #5b6b7d; font-size: 0.8rem; }
+.loading-box { text-align: center; padding: 3rem; color: #5b6b7d; }
+.empty-state { text-align: center; padding: 3rem; }
+
+@media print {
+    .no-print { display: none !important; }
+    .invoice-doc { border: none; box-shadow: none; }
+}

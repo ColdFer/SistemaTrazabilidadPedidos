@@ -1,0 +1,207 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="location-picker">
+    <div class="map-container" id="@mapContainerId" style="height: 400px; border-radius: 12px; border: 1px solid #e0e6ed;"></div>
+    <div class="map-info">
+        <div class="coords-row">
+            <span>Lat: <strong>@latitude.ToString("F6")</strong></span>
+            <span>Lng: <strong>@longitude.ToString("F6")</strong></span>
+        </div>
+        <div class="geocoding-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input class="address-input" style="flex: 1;" @bind="searchText" @bind:event="oninput"
+                   placeholder="Buscar dirección..." />
+            <button class="btn-search" @onclick="SearchAddress" disabled="@searching"
+                    style="padding: 6px 12px; border: 1px solid #ccc; border-radius: 6px; cursor: pointer;">
+                @if (searching)
+                {
+                    <text>Buscando...</text>
+                }
+                else
+                {
+                    <text>🔍</text>
+                }
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(searchError))
+        {
+            <p style="color: #e53935; font-size: 0.85rem; margin-bottom: 8px;">@searchError</p>
+        }
+        <input class="address-input" @bind="addressText" @bind:event="oninput"
+               placeholder="Dirección de entrega (opcional)" />
+        <input class="address-input" @bind="referenceText" @bind:event="oninput"
+               placeholder="Referencia (ej: frente al parque)" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public double InitialLat { get; set; } = -17.7833;
+    [Parameter] public double InitialLng { get; set; } = -63.1821;
+    [Parameter] public int Zoom { get; set; } = 13;
+    [Parameter] public string? InitialAddress { get; set; }
+    [Parameter] public string? InitialReference { get; set; }
+    [Parameter] public EventCallback<LocationResult> OnLocationChanged { get; set; }
+
+    private string mapContainerId = $"map_{Guid.NewGuid():N}";
+    private double latitude;
+    private double longitude;
+    private string? addressText;
+    private string? referenceText;
+    private string searchText = "";
+    private bool mapInitialized;
+    private bool searching;
+    private string? searchError;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            latitude = InitialLat;
+            longitude = InitialLng;
+            addressText = InitialAddress;
+            referenceText = InitialReference;
+
+            await JS.InvokeVoidAsync("leafletInterop.initMap",
+                mapContainerId, latitude, longitude, Zoom,
+                DotNetObjectReference.Create(this), "OnMarkerMoved");
+
+            mapInitialized = true;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnMarkerMoved(double lat, double lng)
+    {
+        latitude = lat;
+        longitude = lng;
+
+        if (string.IsNullOrWhiteSpace(addressText))
+        {
+            try
+            {
+                using var http = new HttpClient();
+                http.DefaultRequestHeaders.Add("User-Agent", "NovaTecERP/1.0");
+                var url = $"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat.ToString(System.Globalization.CultureInfo.InvariantCulture)}&lon={lng.ToString(System.Globalization.CultureInfo.InvariantCulture)}&zoom=18&addressdetails=1";
+                var result = await http.GetFromJsonAsync<NominatimResult>(url);
+
+                if (result != null && !string.IsNullOrEmpty(result.display_name))
+                {
+                    addressText = result.display_name;
+                }
+            }
+            catch
+            {
+                addressText = $"Lat: {lat:F4}, Lng: {lng:F4}";
+            }
+        }
+
+        StateHasChanged();
+        await OnLocationChanged.InvokeAsync(new LocationResult
+        {
+            Latitude = latitude,
+            Longitude = longitude,
+            Address = addressText,
+            Reference = referenceText
+        });
+    }
+
+    private async Task SearchAddress()
+    {
+        if (string.IsNullOrWhiteSpace(searchText)) return;
+
+        searching = true;
+        searchError = null;
+        StateHasChanged();
+
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("User-Agent", "TrazabilidadPedidosERP/1.0");
+            var url = $"https://nominatim.openstreetmap.org/search?format=json&q={Uri.EscapeDataString(searchText)}&limit=5&countrycodes=bo";
+            var results = await http.GetFromJsonAsync<List<NominatimResult>>(url);
+
+            if (results != null && results.Count > 0)
+            {
+                var first = results[0];
+                latitude = double.Parse(first.lat, System.Globalization.CultureInfo.InvariantCulture);
+                longitude = double.Parse(first.lon, System.Globalization.CultureInfo.InvariantCulture);
+                addressText = first.display_name;
+
+                if (mapInitialized)
+                {
+                    await JS.InvokeVoidAsync("leafletInterop.updateMarker",
+                        mapContainerId, latitude, longitude);
+                }
+
+                await OnLocationChanged.InvokeAsync(new LocationResult
+                {
+                    Latitude = latitude,
+                    Longitude = longitude,
+                    Address = addressText,
+                    Reference = referenceText
+                });
+            }
+            else
+            {
+                searchError = "No se encontraron resultados.";
+            }
+        }
+        catch
+        {
+            searchError = "Error al buscar dirección. Intenta de nuevo.";
+        }
+        finally
+        {
+            searching = false;
+            StateHasChanged();
+        }
+    }
+
+    public async Task SetLocation(double lat, double lng, string? address, string? reference)
+    {
+        latitude = lat;
+        longitude = lng;
+        addressText = address;
+        referenceText = reference;
+
+        if (mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletInterop.updateMarker",
+                mapContainerId, lat, lng);
+        }
+    }
+
+    public LocationResult GetLocation()
+    {
+        return new LocationResult
+        {
+            Latitude = latitude,
+            Longitude = longitude,
+            Address = addressText,
+            Reference = referenceText
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletInterop.destroyMap", mapContainerId);
+        }
+    }
+
+    public class LocationResult
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public string? Address { get; set; }
+        public string? Reference { get; set; }
+    }
+
+    private class NominatimResult
+    {
+        public string lat { get; set; } = "";
+        public string lon { get; set; } = "";
+        public string display_name { get; set; } = "";
+    }
+}

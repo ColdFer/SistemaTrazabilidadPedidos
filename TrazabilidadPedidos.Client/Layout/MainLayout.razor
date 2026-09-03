@@ -1,70 +1,58 @@
 @inherits LayoutComponentBase
+@inject Microsoft.JSInterop.IJSRuntime JS
 
-@* Required *@
-<MudThemeProvider Theme="_currentTheme" @bind-IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-
-@* Needed for dialogs *@
-<MudDialogProvider />
-
-@* Needed for snackbars *@
-<MudSnackbarProvider />
-
-<MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudText Typo="Typo.h5" Class="ml-3">App POS</MudText>
-        <MudSpacer />
-        <MudToggleIconButton @bind-Toggled="@_isDarkMode"
-                             Icon="@Icons.Material.Filled.LightMode" ToggledColor="Color.Warning" Class="ml-4"></MudToggleIconButton>
-    </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+<div class="app-container">
+    <aside class="sidebar">
         <NavMenu />
-    </MudDrawer>
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt_4">
+    </aside>
+
+    <div class="main-container">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1>NovaTec</h1>
+                <span>Tienda tecnológica con gestión de clientes, inventario y despachos</span>
+            </div>
+
+            <div class="user-area">
+                <div class="user-avatar">@UserInitial</div>
+
+                <div class="user-details">
+                    <strong>@userName</strong>
+                    <span>@userRole</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
             @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+        </main>
+    </div>
+</div>
 
 @code {
-    bool _drawerOpen = true;
-    bool _isDarkMode = false;
-    MudTheme _currentTheme = new MudTheme();
+    private string userName = "Usuario";
+    private string userRole = "";
 
-    protected override void OnInitialized()
+    private string UserInitial =>
+        string.IsNullOrWhiteSpace(userName) ? "U" : userName[..1].ToUpper();
+
+    private string GetRoleDisplayName(string role) => role switch
     {
-        _currentTheme = new MudTheme()
+        "Administrator" => "Administrador",
+        "Operator" => "Operador",
+        "Customer" => "Cliente",
+        "DeliveryDriver" => "Repartidor",
+        _ => role
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
         {
-            PaletteLight = new PaletteLight()
-            {
-                Primary = "#594AE2",
-                Secondary = "#E91E63",
-                AppbarBackground = "#594AE2",
-            },
-            PaletteDark = new PaletteDark()
-            {
-                Primary = "#7E6FFF",
-                Secondary = "#F48FB1",
-                AppbarBackground = "#1E1E2D",
-            },
-            Typography = new Typography()
-            {
-                Default = new DefaultTypography()
-                {
-                    FontFamily = new[] { "Roboto", "Helvetica", "Arial", "sans-serif" }
-                }
-            },
-            LayoutProperties = new LayoutProperties()
-            {
-                DefaultBorderRadius = "4px"
-            }
-        };
-    }
-    void DrawerToggle()
-    {
-        _drawerOpen = !_drawerOpen;
+            userName = await JS.InvokeAsync<string>("localStorage.getItem", "userName") ?? "Usuario";
+            var rawRole = await JS.InvokeAsync<string>("localStorage.getItem", "userRole") ?? "";
+            userRole = GetRoleDisplayName(rawRole);
+            StateHasChanged();
+        }
     }
 }
-

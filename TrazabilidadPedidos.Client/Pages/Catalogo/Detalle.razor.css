@@ -1,0 +1,240 @@
+.detail-page {
+    max-width: 950px;
+    margin: auto;
+}
+
+.btn-back {
+    background: white;
+    border: 1px solid #d9e0ea;
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #536274;
+    margin-bottom: 24px;
+}
+
+.btn-back:hover {
+    background: #f4f7fb;
+}
+
+.alert-success {
+    background: #e9f7ef;
+    border: 1px solid #b9e5ca;
+    color: #26784c;
+    padding: 13px 16px;
+    border-radius: 9px;
+    margin-bottom: 18px;
+    font-size: 14px;
+}
+
+.alert-error {
+    background: #fff0f0;
+    border: 1px solid #f1c5c5;
+    color: #a63d3d;
+    padding: 13px 16px;
+    border-radius: 9px;
+    margin-bottom: 18px;
+    font-size: 14px;
+}
+
+.detail-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    background: white;
+    border: 1px solid #e1e7ee;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 6px 18px rgba(25, 48, 76, .05);
+}
+
+.detail-image {
+    background: #f4f7fb;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 350px;
+    overflow: hidden;
+}
+
+.detail-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-placeholder-lg {
+    width: 120px;
+    height: 120px;
+    border-radius: 24px;
+    background: #e8f1ff;
+    color: #3478d4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 42px;
+    font-weight: 800;
+}
+
+.category-badge {
+    display: inline-block;
+    background: #f0f4ff;
+    color: #3478d4;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.detail-info h1 {
+    margin: 10px 0 14px;
+    color: #17324d;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.detail-price {
+    font-size: 28px;
+    font-weight: 800;
+    color: #26784c;
+    margin: 0 0 16px;
+}
+
+.detail-description {
+    color: #7b8796;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.detail-stock {
+    margin-bottom: 20px;
+}
+
+.stock-available {
+    display: inline-block;
+    background: #e5f6ed;
+    color: #258158;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.stock-unavailable {
+    display: inline-block;
+    background: #f2f3f5;
+    color: #7b8490;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.quantity-section {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.quantity-section label {
+    font-weight: 700;
+    font-size: 14px;
+    color: #40526a;
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid #d7dee8;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.qty-btn {
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: #f4f7fb;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    color: #3478d4;
+}
+
+.qty-btn:hover:not(:disabled) {
+    background: #e8f1ff;
+}
+
+.qty-btn:disabled {
+    color: #ccc;
+    cursor: not-allowed;
+}
+
+.qty-value {
+    width: 48px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #17324d;
+}
+
+.subtotal {
+    font-size: 16px;
+    color: #40526a;
+    margin-bottom: 20px;
+}
+
+.subtotal strong {
+    color: #17324d;
+    font-size: 18px;
+}
+
+.btn-add-cart {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    background: #3478d4;
+    color: white;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-add-cart:hover {
+    background: #2868bb;
+}
+
+.btn-add-cart:disabled {
+    opacity: .65;
+    cursor: not-allowed;
+}
+
+.loading-box,
+.empty-box {
+    padding: 55px 20px;
+    text-align: center;
+    color: #8591a0;
+}
+
+.empty-box strong {
+    color: #536174;
+}
+
+@media (max-width: 768px) {
+    .detail-card {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-image {
+        min-height: 250px;
+    }
+}
